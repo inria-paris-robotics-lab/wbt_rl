@@ -1,0 +1,4 @@
+# LAFAN dataset metadata
+raw_format: lafan_bvh
+file_pattern: "*.bvh"
+discover: single_files       # glob file_pattern in dataset_path, yield (stem, path)

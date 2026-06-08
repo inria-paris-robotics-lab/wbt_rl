@@ -1,0 +1,4 @@
+# OMOMO dataset metadata
+raw_format: omomo_smplh_p
+file_pattern: "train_diffusion_manip_seq_joints24.p"
+discover: pickle_keys        # load the .p file with joblib, iterate over keys

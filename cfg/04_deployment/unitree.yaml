@@ -1,0 +1,23 @@
+# cfg/deployment/unitree.yaml — WBT-RL unitree deployment config
+env: unitree_control_interface
+cyclonedds_ws: modules/04_deployment/unitree_ros2/cyclonedds_ws
+
+entry_points:
+  sim:
+    cmd: ros2 launch unitree_simulation launch_sim.launch.py
+    args:
+      robot:        robot:=
+      unlock_base:  unlock_base:=
+    defaults:
+      unlock_base: "False"
+
+  watchdog:
+    cmd: ros2 launch unitree_control_interface watchdog.launch.py
+    args:
+      robot_type: robot_type:=
+
+  bridge:
+    cmd: python {repo_root}/src/ros2_bridge/holosoma_inference_custom.py
+
+  shutdown_sportsmode:
+    cmd: ros2 run unitree_control_interface shutdown_sportsmode.py

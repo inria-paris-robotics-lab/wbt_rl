@@ -1,0 +1,4 @@
+# SFU / AMASS dataset metadata
+raw_format: sfu_smplx_npz
+file_pattern: "**/*_stageii.npz"
+discover: single_files

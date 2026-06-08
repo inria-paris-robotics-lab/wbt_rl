@@ -1,0 +1,22 @@
+# holosoma_custom inference — WBT-RL module config
+# Repo: Guillaume-Bsst/holosoma_custom (src/holosoma_inference/)
+
+native_input_format: policy_pt
+native_output_format: unitree_ros2_cmd
+
+env: hsinference
+env_prefix: $HOME/.holosoma_deps/miniconda3/envs/hsinference
+
+entry_points:
+  ros2:
+    cmd: >
+      unset PYTHONPATH ROS_DISTRO AMENT_PREFIX_PATH CMAKE_PREFIX_PATH &&
+      export PATH=$PATH:$HOME/.wbt_deps/miniconda3/envs/unitree_control_interface/bin &&
+      source modules/04_deployment/unitree_ros2/cyclonedds_ws/install/setup.bash &&
+      source <(ros2 run unitree_control_interface autoset_environment_dds.py SIMULATION) &&
+      export PYTHONPATH=$PWD/modules/third_party/holosoma_custom/src/holosoma_inference:$HOME/.holosoma_deps/miniconda3/envs/hsinference/lib/python3.11/site-packages:$PYTHONPATH &&
+      $HOME/.holosoma_deps/miniconda3/envs/hsinference/bin/python modules/03_inference/holosoma_custom/run_policy.py
+    extra_args: "--robot.sdk-type ros2"
+    args:
+      config:      # positional
+      model_path:  --task.model-path

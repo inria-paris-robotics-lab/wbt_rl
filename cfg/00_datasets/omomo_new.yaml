@@ -1,0 +1,4 @@
+# OMOMO_NEW dataset metadata
+raw_format: omomo_new_pt
+file_pattern: "*.pt"
+discover: single_files

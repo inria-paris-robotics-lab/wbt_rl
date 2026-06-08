@@ -1,0 +1,27 @@
+# holosoma_prep — data preprocessing using holosoma env
+# Runs in hsretargeting (human_body_prior + lafan1 available)
+
+env: hsretargeting
+
+entry_points:
+  lafan_to_joints:
+    cmd: python src/motion_convertor/wrappers/lafan_to_joints.py
+    args:
+      input:  --input
+      output: --output
+      format: --format     # yup | unified
+
+  sfu_to_joints:
+    cmd: python src/motion_convertor/wrappers/sfu_to_joints.py
+    args:
+      input:      --input
+      output:     --output
+      model_root: --model_root
+
+  omomo_to_joints:
+    cmd: python src/motion_convertor/wrappers/omomo_to_joints.py
+    args:
+      pickle:    --pickle
+      index:     --index
+      output:    --output
+      model_dir: --model_dir

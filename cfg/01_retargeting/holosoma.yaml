@@ -1,0 +1,58 @@
+# holosoma retargeter — WBT-RL module config
+# Repo: amazon-far/holosoma (src/holosoma_retargeting/)
+
+native_input_format:
+  LAFAN:      holosoma_npy
+  SFU:        holosoma_smplx_npz
+  OMOMO:      holosoma_smplh_npz
+  OMOMO_NEW:  holosoma_pt
+
+native_output_format: holosoma_qpos_npz
+input_path_style: dir
+
+entry_point_by_input_format:
+  holosoma_npy:       single
+  holosoma_smplx_npz: single
+  holosoma_smplh_npz: single
+  holosoma_pt:        single
+
+format_args:
+  holosoma_npy:       {data_format: lafan}
+  holosoma_smplx_npz: {data_format: smplx}
+  # HACK: Use 'smplx' label for OMOMO .npz to bypass Holosoma's hardcoded 
+  # expectation that 'smplh' label MUST be a .pt file.
+  holosoma_smplh_npz: {data_format: smplx}
+  holosoma_pt:        {data_format: smplh}
+
+robot_config:
+  G1_29dof:
+    urdf: modules/third_party/holosoma/src/holosoma_retargeting/holosoma_retargeting/models/g1/g1_29dof.urdf
+
+env: hsretargeting
+
+wrappers:
+  convert: src/motion_convertor/wrappers/holosoma_convert.py
+
+entry_points:
+  single:
+    cmd: python examples/robot_retarget.py
+    cwd: modules/01_retargeting/holosoma
+    args:
+      input_dir:   --data_path
+      output_dir:  --save_dir
+      task_type:   --task-type
+      task_name:   --task-name
+      data_format: --data_format
+      robot_urdf:  --robot-config.robot-urdf-file
+      visualize:   --retargeter.visualize
+      debug:       --retargeter.debug
+  batch:
+    cmd: python examples/parallel_robot_retarget.py
+    cwd: modules/01_retargeting/holosoma
+    args:
+      input_dir:   --data-dir
+      output_dir:  --save_dir
+      task_type:   --task-type
+      data_format: --data_format
+      robot_urdf:  --robot-config.robot-urdf-file
+      object_name: --task-config.object-name

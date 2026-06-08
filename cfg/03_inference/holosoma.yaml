@@ -1,0 +1,21 @@
+# holosoma inference — WBT-RL module config
+# Repo: amazon-far/holosoma (src/holosoma_inference/)
+
+native_input_format: policy_pt
+native_output_format: unitree_ros2_cmd
+
+env: hsinference
+
+entry_points:
+  sim:
+    cmd: python modules/03_inference/holosoma/run_policy.py
+    args:
+      config:      # positional
+      model_path:  --task.model-path
+      motion_file: --task.motion-file
+  real:
+    cmd: python modules/03_inference/holosoma/run_policy.py
+    args:
+      config:      # positional
+      model_path:  --task.model-path
+      motion_file: --task.motion-file

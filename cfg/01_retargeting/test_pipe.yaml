@@ -1,0 +1,19 @@
+# test_pipe retargeter — WBT-RL module config
+# Repo: modules/third_party/test_pipe (src/test_pipe_retargeting/)
+# TODO: fill in native_input_format per dataset once retargeting stage is designed.
+
+native_input_format:
+  LAFAN: ~      # TODO
+  SFU:   ~      # TODO
+
+native_output_format: ~    # TODO
+input_path_style: dir
+
+env: tpretargeting
+env_prefix: ~/.test_pipe_deps/miniconda3/envs/tpretargeting
+
+entry_points:
+  single:
+    cmd: ~      # TODO
+    cwd: modules/01_retargeting/test_pipe
+    args: {}

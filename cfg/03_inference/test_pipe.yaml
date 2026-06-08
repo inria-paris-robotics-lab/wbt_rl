@@ -1,0 +1,16 @@
+# test_pipe inference — WBT-RL module config
+# Repo: modules/third_party/test_pipe (src/test_pipe_inference/)
+# TODO: fill in entry_points once inference stage is designed.
+
+native_input_format: policy_pt
+native_output_format: unitree_ros2_cmd
+
+env: tpinference
+
+entry_points:
+  sim:
+    cmd: ~     # TODO
+    args: {}
+  real:
+    cmd: ~     # TODO
+    args: {}

@@ -1,0 +1,23 @@
+# test_pipe training — WBT-RL module config
+# Repo: modules/third_party/test_pipe (src/test_pipe/)
+# TODO: fill in simulators, robot_exp_map, and args once training stage is designed.
+
+native_input_format: ~     # TODO
+native_output_format: policy_pt
+
+simulators:
+  mjwarp:
+    env: tpmujoco
+    setup_script: modules/third_party/test_pipe/scripts/source_mujoco_setup.sh
+    cmd: ~     # TODO
+    extra_args: ~
+
+# robot_exp_map:
+#   G1_29dof:
+#     mjwarp:
+#       ppo:
+#         robot_only: ~
+
+args:
+  motion_dir:  ~    # TODO
+  output_dir:  ~    # TODO

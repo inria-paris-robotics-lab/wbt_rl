@@ -1,0 +1,52 @@
+# GMR retargeter — WBT-RL module config
+# Repo: https://github.com/YanjieZe/GMR
+
+native_input_format:
+  LAFAN:     gmr_bvh
+  SFU:       gmr_smplx_npz
+  OMOMO:     gmr_smplx_npz
+
+native_output_format: gmr_pkl
+
+entry_point_by_input_format:
+  gmr_bvh:       bvh
+  gmr_smplx_npz: smplx
+
+robot_config:
+  G1_29dof:
+    name: unitree_g1
+  H1_29dof:
+    name: unitree_h1
+
+env: gmr
+
+wrappers:
+  fk: src/motion_convertor/wrappers/gmr_fk.py
+
+entry_points:
+  smplx:
+    cmd: python src/motion_convertor/wrappers/gmr_smplx.py
+    args:
+      input:            --smplx_file
+      output:           --save_path
+      robot:            --robot
+      body_model_path:  --body_model_path
+  smplx_batch:
+    cmd: python modules/01_retargeting/GMR/scripts/smplx_to_robot_dataset.py
+    args:
+      input_dir:  --src_folder
+      output_dir: --tgt_folder
+      robot:      --robot
+  bvh:
+    cmd: python modules/01_retargeting/GMR/scripts/bvh_to_robot.py
+    args:
+      input:  --bvh_file
+      output: --save_path
+      robot:  --robot
+      format: --format
+  bvh_batch:
+    cmd: python modules/01_retargeting/GMR/scripts/bvh_to_robot_dataset.py
+    args:
+      input_dir:  --src_folder
+      output_dir: --tgt_folder
+      robot:      --robot

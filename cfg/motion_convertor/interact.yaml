@@ -1,0 +1,20 @@
+# InterAct — WBT-RL module config
+# Repo: wzyabcas/InterAct (third_party/InterAct)
+# Role: converts OMOMO raw .p → .pt tensors for holosoma object_interaction
+# Install: conda activate interact && pip install -r src/motion_convertor/third_party/InterAct/requirements.txt
+
+env: interact
+
+# Single wrapper that runs both InterAct stages (process_omomo + interact2mimic)
+# for one sequence, with patched hardcoded paths.
+entry_points:
+  omomo_to_pt:
+    cmd: python src/motion_convertor/wrappers/omomo_to_intermimic.py
+    args:
+      seq_name:       --seq_name
+      pickle_file:    --pickle_file
+      smplh_pkl_dir:  --smplh_pkl_dir
+      smplh_npz_root: --smplh_npz_root
+      smplx_path:     --smplx_path
+      object_path:    --object_path
+      output:         --output

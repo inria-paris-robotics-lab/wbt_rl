@@ -1,0 +1,72 @@
+# holosoma_custom training — WBT-RL module config
+# Repo: Guillaume-Bsst/holosoma_custom (src/holosoma/)
+
+native_input_format: holosoma_trainer_npz
+native_output_format: policy_pt
+
+simulators:
+  isaacgym:
+    env: hsgym
+    setup_script: modules/third_party/holosoma_custom/scripts/source_isaacgym_setup.sh
+    cmd: python modules/02_training/holosoma_custom/train_agent.py
+    extra_args: simulator:isaacgym
+
+  isaacsim:
+    env: hssim
+    setup_script: modules/third_party/holosoma_custom/scripts/source_isaacsim_setup.sh
+    env_vars:
+      OMNI_KIT_ACCEPT_EULA: "1"
+    cmd: python modules/02_training/holosoma_custom/train_agent.py
+    extra_args: simulator:isaacsim
+
+  mjwarp:
+    env: hsmujoco
+    setup_script: modules/third_party/holosoma_custom/scripts/source_mujoco_setup.sh
+    cmd: python modules/02_training/holosoma_custom/train_agent.py
+    extra_args: simulator:mjwarp
+
+# Maps (robot, simulator, algo, task_type) → holosoma_custom exp: subcommand name.
+# The simulator is selected via extra_args (simulator:mjwarp / simulator:isaacsim),
+# so exp names are simulator-agnostic. isaacgym has no WBT presets.
+robot_exp_map:
+  G1_29dof:
+    isaacsim:
+      ppo:
+        robot_only: g1-29dof-wbt
+        with_object: g1-29dof-wbt-w-object
+        with_object_actor: g1-29dof-wbt-w-object-actor
+      fast_sac:
+        robot_only: g1-29dof-wbt-fast-sac
+        with_object: g1-29dof-wbt-fast-sac-w-object
+    mjwarp:
+      ppo:
+        robot_only: g1-29dof-wbt
+        with_object: g1-29dof-wbt-w-object
+        with_object_actor: g1-29dof-wbt-w-object-actor
+      fast_sac:
+        robot_only: g1-29dof-wbt-fast-sac
+        with_object: g1-29dof-wbt-fast-sac-w-object
+  G1_27dof:
+    isaacsim:
+      ppo:
+        robot_only: g1-27dof-wbt
+        with_object: g1-27dof-wbt-w-object
+        with_object_actor: g1-27dof-wbt-w-object-actor
+      fast_sac:
+        robot_only: g1-27dof-wbt-fast-sac
+        with_object: g1-27dof-wbt-fast-sac-w-object
+    mjwarp:
+      ppo:
+        robot_only: g1-27dof-wbt
+        with_object: g1-27dof-wbt-w-object
+        with_object_actor: g1-27dof-wbt-w-object-actor
+      fast_sac:
+        robot_only: g1-27dof-wbt-fast-sac
+        with_object: g1-27dof-wbt-fast-sac-w-object
+
+args:
+  motion_file:    --command.setup_terms.motion_command.params.motion_config.motion_file
+  output_dir:     --logger.base-dir
+  num_envs:       --training.num-envs
+  checkpoint:     --training.checkpoint
+  object_urdf:    --robot.object.object_urdf_path

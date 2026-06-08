@@ -1,0 +1,48 @@
+# holosoma training — WBT-RL module config
+# Repo: amazon-far/holosoma (src/holosoma/)
+# Install: follow modules/third_party/holosoma/src/holosoma/README.md
+
+native_input_format: holosoma_trainer_npz
+native_output_format: policy_pt
+
+# holosoma uses one conda env per simulator — select with --simulator flag in scripts/train.py
+simulators:
+  isaacgym:
+    env: hsgym
+    setup_script: modules/third_party/holosoma/scripts/source_isaacgym_setup.sh
+    cmd: python modules/02_training/holosoma/train_agent.py
+    extra_args: simulator:isaacgym
+
+  isaacsim:
+    env: hssim
+    setup_script: modules/third_party/holosoma/scripts/source_isaacsim_setup.sh
+    env_vars:
+      OMNI_KIT_ACCEPT_EULA: "1"
+    cmd: python modules/02_training/holosoma/train_agent.py
+    extra_args: simulator:isaacsim
+
+  mjwarp:
+    env: hsmujoco
+    setup_script: modules/third_party/holosoma/scripts/source_mujoco_setup.sh
+    cmd: python modules/02_training/holosoma/train_agent.py
+    extra_args: simulator:mjwarp
+
+# Maps (robot, simulator, algo, task_type) → holosoma exp: subcommand name.
+# WBT requires IsaacSim — IsaacGym and MJWarp are not supported (asserted in wbt_manager.py).
+# Unsupported simulator → error before subprocess is launched.
+robot_exp_map:
+  G1_29dof:
+    isaacsim:
+      ppo:
+        robot_only: g1-29dof-wbt
+        with_object: g1-29dof-wbt-w-object
+      fast_sac:
+        robot_only: g1-29dof-wbt-fast-sac
+        with_object: g1-29dof-wbt-fast-sac-w-object
+
+# Common args (all simulators)
+args:
+  motion_dir:     --command.setup_terms.motion_command.params.motion_config.motion_dir
+  output_dir:     --logger.base-dir
+  num_envs:       --training.num-envs
+  checkpoint:     --training.checkpoint   # optional, resume from checkpoint

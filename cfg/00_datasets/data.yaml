@@ -1,0 +1,24 @@
+# cfg/data.yaml — paths to raw datasets and body models
+# All paths are relative to the repo root.
+# Edit this file if your data lives elsewhere.
+
+raw_datasets:
+  LAFAN:
+    path: data/00_raw_datasets/LAFAN/lafan1
+
+  SFU:
+    path: data/00_raw_datasets/SFU/SFU
+    body_model: data/00_raw_datasets/models/models_smplx_v1_1/models
+    body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
+
+  OMOMO:
+    path: data/00_raw_datasets/OMOMO/data
+    body_model: data/00_raw_datasets/models/smplh
+    body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
+
+  OMOMO_NEW:
+    path: data/00_raw_datasets/OMOMO_new
+
+output:
+  retargeted_motions: data/01_retargeted_motions
+  policies:           data/02_policies
