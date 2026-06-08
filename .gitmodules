@@ -1,0 +1,27 @@
+[submodule "modules/01_retargeting/GMR"]
+	path = modules/01_retargeting/GMR
+	url = https://github.com/YanjieZe/GMR.git
+[submodule "modules/third_party/holosoma"]
+	path = modules/third_party/holosoma
+	url = https://github.com/amazon-far/holosoma.git
+[submodule "src/motion_convertor/third_party/InterAct"]
+	path = src/motion_convertor/third_party/InterAct
+	url = https://github.com/wzyabcas/InterAct.git
+[submodule "modules/third_party/holosoma_custom"]
+	path = modules/third_party/holosoma_custom
+	url = https://github.com/Guillaume-Bsst/holosoma_custom.git
+[submodule "modules/04_deployment/unitree_ros2"]
+	path = modules/04_deployment/unitree_ros2
+	url = https://github.com/unitreerobotics/unitree_ros2.git
+[submodule "src/motion_convertor/third_party/lafan1"]
+	path = src/motion_convertor/third_party/lafan1
+	url = https://github.com/ubisoft/ubisoft-laforge-animation-dataset.git
+[submodule "src/motion_convertor/third_party/human_body_prior"]
+	path = src/motion_convertor/third_party/human_body_prior
+	url = https://github.com/nghorbani/human_body_prior.git
+[submodule "src/motion_convertor/third_party/smplx"]
+	path = src/motion_convertor/third_party/smplx
+	url = https://github.com/vchoutas/smplx.git
+[submodule "modules/third_party/test_pipe"]
+	path = modules/third_party/test_pipe
+	url = https://github.com/Guillaume-Bsst/test_pipe.git
