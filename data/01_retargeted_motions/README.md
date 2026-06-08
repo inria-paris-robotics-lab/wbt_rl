@@ -17,22 +17,10 @@ Each run is stored in a timestamped subfolder with its config:
 └── latest -> run_YYYYMMDD_HHMMSS/    # symlink to the most recent run
 ```
 
-The `_unified` files are produced by `src/motion_convertor/`. See [specs/README.md](../../specs/README.md) for the full format specification of each dataset and retargeter.
-
----
-
-## Unified format
-
-All `_unified.npz` files follow this schema:
-
-| Key | Shape | Description |
-|-----|-------|-------------|
-| `global_joint_positions` | `(T, 22, 3)` | Joint positions in world frame (metres), Z-up |
-| `height` | `float` | Subject height in metres |
-| `object_poses` *(optional)* | `(T, 7)` | `[qw, qx, qy, qz, x, y, z]` — object interaction only |
-
-- 22 joints, SMPL-X convention
-- Coordinate system: Z-up, world frame, metres
+The `_unified.npz` files are produced by `src/motion_convertor/` and all follow a single schema
+(`global_joint_positions (T,22,3)` Z-up + `height` + optional `object_poses (T,7)`). The
+[motion_convertor README](../../src/motion_convertor/README.md#unified-format) is the **canonical
+reference** for that format.
 
 ---
 
@@ -47,17 +35,21 @@ All `_unified.npz` files follow this schema:
 │   │   └── terrains/
 │   └── SFU/terrains/
 │
-├── LAFAN_G1/
+├── LAFAN_G1_29dof/
 │   ├── GMR/run_{timestamp}/
-│   └── holosoma_retargeting/run_{timestamp}/
-├── SFU_G1/
+│   └── holosoma/run_{timestamp}/
+├── SFU_G1_29dof/
 │   ├── GMR/run_{timestamp}/
-│   └── holosoma_retargeting/run_{timestamp}/
-├── OMOMO_robot_only_G1/
+│   └── holosoma_custom/run_{timestamp}/
+├── OMOMO_robot_G1_29dof/                # robot_only retargets
 │   ├── GMR/run_{timestamp}/
-│   └── holosoma_retargeting/run_{timestamp}/
-└── OMOMO_object_interaction_G1/
-    └── holosoma_retargeting/run_{timestamp}/
+│   └── holosoma/run_{timestamp}/
+└── OMOMO_object_G1_27dof/               # object_interaction retargets
+    └── holosoma_custom/run_{timestamp}/
 ```
+
+`{robot}` always carries its DOF suffix (`G1_29dof`, `G1_27dof`) and `{retargeter}` is the value passed to
+`--retargeter` (`GMR`, `holosoma`, `holosoma_custom`). OMOMO splits into `OMOMO_robot_*` and `OMOMO_object_*`
+sub-trees (see [scripts/README.md](../../scripts/README.md)).
 
 Folders are created automatically by `scripts/retarget.py` — no need to create them manually.

@@ -56,7 +56,8 @@ All files land in `01_retargeted_motions/{dataset}_{robot}/{retargeter}/run_{tim
 | `height` | float | Subject height in metres |
 | `object_poses` *(optional)* | `(T, 7)` | `[qw, qx, qy, qz, x, y, z]` |
 
-22 joints, SMPL-X convention. See [specs/README.md](../../specs/README.md).
+22 joints, SMPL-X convention; quaternions are wxyz (MuJoCo convention) throughout. **This section is the
+canonical reference for the unified format** — other docs link here rather than redefining it.
 
 ---
 
@@ -65,33 +66,40 @@ All files land in `01_retargeted_motions/{dataset}_{robot}/{retargeter}/run_{tim
 ```
 src/motion_convertor/
 ├── __init__.py                   # 4 public dispatch functions
+├── connectors.py                 # (src_fmt, dst_fmt) → converter dispatch table
+├── formats.py                    # format registry + validate_format()
 ├── unified.py                    # save_unified / load_unified
-├── _config.py                    # loads cfg/data.yaml, exposes repo_root() etc.
-├── _subprocess.py                # conda_run(), run_entry_point()
+├── _config.py                    # loads cfg/00_datasets/data.yaml, exposes repo_root() etc.
+├── _subprocess.py                # conda_run(), run_entry_point(), load_module_cfg()
 ├── _to_unified_input/            # dataset FK → (T,22,3) Z-up
 │   ├── lafan.py
 │   ├── sfu.py
 │   └── omomo.py
 ├── _to_retargeter_input/         # (dataset, retargeter) native input
-│   ├── lafan_gmr.py
-│   ├── lafan_holosoma.py
-│   ├── sfu_gmr.py
-│   ├── sfu_holosoma.py
-│   ├── omomo_gmr.py
-│   └── omomo_holosoma.py
+│   ├── lafan_gmr.py / lafan_holosoma.py
+│   ├── sfu_gmr.py / sfu_holosoma.py
+│   └── omomo_gmr.py / omomo_holosoma.py
 ├── _to_unified_output/           # retargeter output → (T,22,3)
 │   ├── gmr.py
-│   └── holosoma.py
+│   └── holosoma.py               # also used for holosoma_custom output
 ├── _to_trainer_input/            # retargeter output → trainer native
 │   ├── gmr_holosoma.py
-│   └── holosoma_holosoma.py
+│   ├── holosoma_holosoma.py
+│   └── holosoma_custom_holosoma.py
+├── wrappers/                     # thin scripts run via subprocess in module envs
+│   ├── gmr_fk.py / gmr_smplx.py            # gmr env
+│   ├── lafan_to_joints.py / sfu_to_joints.py / holosoma_convert.py  # hsretargeting env
+│   └── omomo_to_joints.py / omomo_to_intermimic.py                  # hsretargeting / interact env
 └── third_party/                  # git submodules
     ├── InterAct/                 # OMOMO → holosoma object_interaction preprocessing
     ├── lafan1/                   # LAFAN BVH tools (used by hsretargeting wrappers)
-    └── human_body_prior/         # SMPL-H FK (used by hsretargeting wrappers)
+    ├── human_body_prior/         # SMPL-H FK (used by hsretargeting wrappers)
+    └── smplx/                    # SMPL-X / SMPL-H body models (FK, merge_smplh_mano)
 ```
 
-The folder structure **is** the documentation: one file per supported (source, target) pair.
+Adding a converter = add one function in `connectors.py` and register its `(src_fmt, dst_fmt)` pair in the
+`CONNECTORS` table. The `_to_*` folders hold the actual conversion code, grouped by role.
+See the repo-root [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full module-authoring checklist.
 
 ---
 
@@ -122,6 +130,7 @@ The folder structure **is** the documentation: one file per supported (source, t
 |-----------|--------------|------------|
 | GMR | `.pkl` — `root_pos (T,3)`, `root_rot (T,4)` xyzw, `dof_pos (T,N)` | xyzw→wxyz swap on root_rot, run robot FK to get `global_joint_positions (T,22,3)` |
 | holosoma | `.npz` — `body_pos_w (T,B,3)`, `body_quat_w (T,B,4)` wxyz, `joint_pos (T,N)` | Extract the 22 tracked body positions → `global_joint_positions (T,22,3)` |
+| holosoma_custom | same `.npz` schema as holosoma | identical conversion — reuses `_to_unified_output/holosoma.py` |
 
 ### retargeter output (raw) → trainer input
 
@@ -132,8 +141,25 @@ Input is always the **raw retargeter output**, not the unified.
 | holosoma | holosoma | **none** — raw output is already form B (body_pos_w, joint_pos, ..., 50 Hz) | `.npz` passed directly |
 | holosoma | holosoma (via native bridge) | Pass raw `qpos (T,36)` output → holosoma runs `convert_data_format_mj.py` internally | form A → form B done inside holosoma |
 | GMR | holosoma | `root_pos + root_rot(xyzw) + dof_pos` → run robot FK in MuJoCo → produce `body_pos_w`, `joint_pos`, etc. at 50 Hz | `.npz` form B |
+| holosoma_custom | holosoma_custom | resampling + object handling (`_to_trainer_input/holosoma_custom_holosoma.py`) | `.npz` form B |
 
 > For holosoma→holosoma: the raw retargeter output **is** already the trainer input (form B). No conversion needed.
+
+> **holosoma_custom** mirrors holosoma's data formats, so it reuses holosoma's unified-output converter and
+> has its own trainer-input converter. **test_pipe** is an experimental sandbox that reuses the holosoma
+> formats as well — it has no dedicated converter and is not part of the benchmarking baseline.
+
+### Two connector philosophies (by design)
+
+The conversion graph is **not** uniform, and this is intentional:
+
+- **Retargeting path** (`to_unified_input` / `to_unified_output`) routes everything **through the unified
+  format** — each solution only needs converters to/from unified, so adding a retargeter is *O(1)*.
+- **Training path** (`to_trainer_input`) uses **direct `(retargeter, trainer)` pairs** (e.g.
+  `gmr_pkl → holosoma_trainer_npz`), **not** the unified format — to preserve retargeter-specific data the
+  unified format drops. The cost: this path is *O(retargeters × trainers)*. With a single trainer family
+  (holosoma) today this is cheap; adding a structurally different trainer means writing one converter per
+  retargeter that feeds it.
 
 ---
 
@@ -141,6 +167,7 @@ Input is always the **raw retargeter output**, not the unified.
 
 | Submodule | Used for |
 |-----------|---------|
-| **InterAct** | SMPL-H processing for OMOMO object_interaction → holosoma (via `scripts/wrappers/omomo_to_intermimic.py`, `interact` env) |
-| **lafan1** | LAFAN BVH parsing utilities (used by `scripts/wrappers/lafan_to_joints.py`, `hsretargeting` env) |
-| **human_body_prior** | SMPL-H forward kinematics for OMOMO (used by `scripts/wrappers/omomo_to_joints.py`, `hsretargeting` env) |
+| **InterAct** | SMPL-H processing for OMOMO object_interaction → holosoma (via `src/motion_convertor/wrappers/omomo_to_intermimic.py`, `interact` env) |
+| **lafan1** | LAFAN BVH parsing utilities (used by `src/motion_convertor/wrappers/lafan_to_joints.py`, `hsretargeting` env) |
+| **human_body_prior** | SMPL-H forward kinematics for OMOMO (used by `src/motion_convertor/wrappers/omomo_to_joints.py`, `hsretargeting` env) |
+| **smplx** | SMPL-X / SMPL-H body models and FK; `merge_smplh_mano` tooling (see `third_party/TODO.md`) |

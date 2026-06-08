@@ -41,7 +41,7 @@ Common fields (when applicable):
 | `args` | mapping of WBT-RL argument names → module CLI flags |
 | `setup_script` | module's own setup/activation script (if needed) |
 
-Modules with multiple environments (e.g. holosoma training with isaacgym/isaacsim/mjwarp) use a `simulators:` sub-dict — one entry per env.
+Modules with multiple environments (e.g. holosoma training across isaacgym/isaacsim) use a `simulators:` sub-dict — one entry per env.
 
 A yaml may declare `base: <other_module>` to inherit and override another yaml in the same stage directory (used by holosoma_custom to extend holosoma).
 
@@ -51,9 +51,10 @@ These files ship with defaults matching the standard install of each submodule. 
 
 ### Adding a new module
 
-1. Add the submodule under `modules/third_party/` and create symlinks in `modules/NN_stage/`
-2. Create `cfg/NN_stage/<module_name>.yaml` following the pattern of existing yamls
-3. Add the corresponding adapter in `src/motion_convertor/` (see `src/motion_convertor/README.md`)
+The `cfg/` part is step 2 below: create `cfg/NN_stage/<module_name>.yaml` following the pattern of the
+existing yamls in that stage directory. This is only one of the coordinated places a new module touches —
+see the repo-root **[CONTRIBUTING.md](../CONTRIBUTING.md)** for the full end-to-end checklist
+(submodule + symlinks, cfg yaml, adapter/connector, installer).
 
 ---
 

@@ -61,15 +61,21 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | **GMR** | [YanjieZe/GMR](https://github.com/YanjieZe/GMR) | LAFAN1, SFU |
 | **holosoma_retargeting** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | LAFAN1, SFU, OMOMO_NEW |
 | **holosoma_retargeting_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | LAFAN1, SFU, OMOMO_NEW |
+| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
-> **OMOMO (original):** pipeline not yet working end-to-end — in progress.
+> **OMOMO (original):** pipeline not yet working end-to-end — 🚧 in progress.
+>
+> ⚠️ **test_pipe** is an experimental sandbox module. It is wired into `cfg/` and ships an installer, but
+> is **excluded from `./install.sh`** (install it on demand with `./install.sh test_pipe_retargeting`).
+> It reuses the holosoma data formats and is **not part of the benchmarking baseline**.
 
 ### Trainers
 
 | Trainer | Source | Algorithms | Simulators |
 |---------|--------|-----------|-----------|
 | **holosoma** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | PPO, FastSAC | IsaacGym, IsaacSim |
-| **holosoma_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | PPO, FastSAC | IsaacGym, IsaacSim, MJWarp |
+| **holosoma_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | PPO, FastSAC | IsaacSim |
+| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental | experimental |
 
 ### Inference
 
@@ -77,6 +83,7 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 |--------|--------|-------|
 | **holosoma_inference** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | MuJoCo sim-to-sim, Unitree API |
 | **holosoma_inference_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | MuJoCo sim-to-sim, Unitree API, **ROS2** |
+| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
 ### Deployment
 
@@ -96,46 +103,48 @@ wbt_rl/
 │   └── 02_policies/
 │
 ├── cfg/                       # module configs — see cfg/README.md
-│   ├── data.yaml              # dataset paths + body model locations
-│   ├── retargeting/
-│   │   ├── gmr.yaml
-│   │   ├── holosoma_retargeting.yaml
-│   │   └── holosoma_retargeting_custom.yaml
-│   ├── training/
-│   │   ├── holosoma.yaml
-│   │   └── holosoma_custom.yaml
-│   └── inference/
-│       ├── holosoma_inference.yaml
-│       └── holosoma_inference_custom.yaml
+│   ├── 00_datasets/           # data.yaml (paths) + per-dataset raw-format metadata
+│   ├── 01_retargeting/        # one yaml per retargeter (gmr, holosoma, holosoma_custom, test_pipe)
+│   ├── 02_training/           # one yaml per trainer (holosoma, holosoma_custom, test_pipe)
+│   ├── 03_inference/          # one yaml per inference engine
+│   ├── 04_deployment/         # one yaml per deployer (unitree)
+│   └── motion_convertor/      # internal preprocessing helpers (not pipeline stages)
 │
 ├── scripts/                   → see scripts/README.md
 │   ├── retarget.py
 │   ├── train.py
 │   ├── infer.py
-│   ├── activate_wbt.sh     # source this to activate the ecosystem
-│   └── wrappers/              # thin scripts that run inside module envs
+│   ├── deploy.py
+│   └── activate_wbt.sh        # source this to activate the ecosystem
 │
 ├── src/
-│   └── motion_convertor/      → see src/motion_convertor/README.md
+│   ├── motion_convertor/      → see src/motion_convertor/README.md
+│   │   └── wrappers/          # thin scripts run inside module envs (subprocess)
+│   └── ros2_bridge/           # ROS2 inference bridge node (used by deploy.py)
 │
 ├── install.sh                 # one-shot installer for all envs
+├── CONTRIBUTING.md            # how to add a new module
 │
 └── modules/
     ├── 01_retargeting/
     │   ├── GMR/                            # submodule — YanjieZe/GMR
     │   ├── holosoma_retargeting            # symlink → third_party/holosoma
-    │   └── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
+    │   ├── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
+    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
     ├── 02_training/
     │   ├── holosoma                        # symlink → third_party/holosoma
-    │   └── holosoma_custom                 # symlink → third_party/holosoma_custom
+    │   ├── holosoma_custom                 # symlink → third_party/holosoma_custom
+    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
     ├── 03_inference/
     │   ├── holosoma_inference              # symlink → third_party/holosoma
-    │   └── holosoma_inference_custom       # symlink → third_party/holosoma_custom
+    │   ├── holosoma_inference_custom       # symlink → third_party/holosoma_custom
+    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
     ├── 04_deployment/
     │   └── unitree_ros2/                   # submodule — unitreerobotics/unitree_ros2
     └── third_party/
         ├── holosoma/                       # submodule — amazon-far/holosoma
-        └── holosoma_custom/                # submodule — Guillaume-Bsst/holosoma_custom
+        ├── holosoma_custom/                # submodule — Guillaume-Bsst/holosoma_custom
+        └── test_pipe/                      # submodule — Guillaume-Bsst/test_pipe  (experimental)
 ```
 
 ---
@@ -144,7 +153,7 @@ wbt_rl/
 
 ### 1 — Clone with submodules
 ```bash
-git clone --recurse-submodules https://github.com/Guillaume-Bsst/wbt_rl
+git clone --recurse-submodules https://github.com/inria-paris-robotics-lab/wbt_rl
 # or after cloning:
 git submodule update --init --recursive
 ```

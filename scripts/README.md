@@ -16,7 +16,7 @@ scripts/retarget.py        (runs in: wbt_rl env)
         │
         └── subprocess.run(             (child process, module's own env)
                 conda run -n {env}
-                python {cmd} {args}     (read from cfg/retargeting/{retargeter}.yaml)
+                python {cmd} {args}     (read from cfg/01_retargeting/{retargeter}.yaml)
             )
 ```
 
@@ -59,8 +59,8 @@ python scripts/retarget.py \
 ```
 
 **What it does, in order:**
-1. Reads `cfg/data.yaml` → resolves raw dataset path
-2. Reads `cfg/retargeting/{retargeter}.yaml` → resolves env, cmd, args, robot URDF/name
+1. Reads `cfg/00_datasets/data.yaml` → resolves raw dataset path
+2. Reads `cfg/01_retargeting/{retargeter}.yaml` → resolves env, cmd, args, robot URDF/name
 3. Validates that `--robot` is listed in `robot_config` for the chosen retargeter (error otherwise)
 4. For each sequence:
    - `motion_convertor.to_retargeter_input()` → `{seq}_input_raw.{ext}`
@@ -162,7 +162,7 @@ python scripts/train.py \
 | `object_interaction` | `--with-object-actor` | Source: with-object retarget → train with object (actor + critic see object) |
 
 **What it does, in order:**
-1. Reads `cfg/training/{trainer}.yaml` → resolves env, cmd, `robot_exp_map`
+1. Reads `cfg/02_training/{trainer}.yaml` → resolves env, cmd, `robot_exp_map`
 2. Validates that `(--robot, --simulator, --algo)` is listed in `robot_exp_map` (error otherwise)
 3. Locates retargeting run using `--retarget-task-type` to resolve the source directory:
    - LAFAN/SFU: `data/01_retargeted_motions/{dataset}_{robot}/{retargeter}/`
@@ -187,15 +187,11 @@ python scripts/train.py \
 | G1_29dof | holosoma | isaacsim | fast_sac | ✅ | ✅ | ❌ |
 | G1_29dof | holosoma_custom | isaacsim | ppo | ✅ | ✅ | ✅ |
 | G1_29dof | holosoma_custom | isaacsim | fast_sac | ✅ | ✅ | ❌ |
-| G1_29dof | holosoma_custom | mjwarp | ppo | ✅ | ✅ | ✅ |
-| G1_29dof | holosoma_custom | mjwarp | fast_sac | ✅ | ✅ | ❌ |
 | G1_27dof | holosoma_custom | isaacsim | ppo | ✅ | ✅ | ✅ |
 | G1_27dof | holosoma_custom | isaacsim | fast_sac | ✅ | ✅ | ❌ |
-| G1_27dof | holosoma_custom | mjwarp | ppo | ✅ | ✅ | ✅ |
-| G1_27dof | holosoma_custom | mjwarp | fast_sac | ✅ | ✅ | ❌ |
 
-> **Note:** holosoma WBT requires IsaacSim — isaacgym and mjwarp are asserted-unsupported at the env level.
-> holosoma_custom does not have WBT presets for isaacgym.
+> **Note:** WBT training runs on **IsaacSim** for both trainers. isaacgym and mjwarp are not supported for
+> WBT (asserted-unsupported at the env level for holosoma; no working WBT presets for holosoma_custom).
 
 **Examples:**
 ```bash
@@ -246,7 +242,7 @@ python scripts/train.py \
     --robot G1_27dof \
     --retargeter holosoma_custom \
     --trainer holosoma_custom \
-    --simulator mjwarp \
+    --simulator isaacsim \
     --retarget-task-type object_interaction \
     --with-object \
     --object-urdf /path/to/my_object.urdf
@@ -257,7 +253,7 @@ python scripts/train.py \
     --robot G1_29dof \
     --retargeter holosoma_custom \
     --trainer holosoma_custom \
-    --simulator mjwarp \
+    --simulator isaacsim \
     --retarget-task-type object_interaction \
     --with-object-actor
 
@@ -301,7 +297,7 @@ python scripts/infer.py \
 | Argument | Required | Notes |
 |---|---|---|
 | `--config` | yes | Tyro inference config (e.g. `inference:g1-29dof-wbt`, `inference:g1-27dof-wbt`) |
-| `--trainer` | no | Default: `holosoma_custom`. Must match a file in `cfg/inference/`. `holosoma` is explicitly unsupported. |
+| `--trainer` | no | Default: `holosoma_custom`. Must match a file in `cfg/03_inference/`. `holosoma` is explicitly unsupported. |
 | `--wandb-run` | wandb mode | Wandb URI passed directly as `--task.model-path` to `run_policy.py`. Mutually exclusive with `--dataset/--robot/--retargeter`. |
 | `--dataset` | local mode | |
 | `--robot` | local mode | Must include DOF suffix (e.g. `G1_29dof`) |
@@ -309,7 +305,7 @@ python scripts/infer.py \
 | `--policy-run` | no | Run ID or `latest` (default: `latest`). Local mode only. |
 
 **What it does:**
-1. Reads `cfg/inference/{trainer}.yaml`
+1. Reads `cfg/03_inference/{trainer}.yaml`
 2. *Local mode:* locates `data/02_policies/{dataset}_{robot}/{retargeter}_{trainer}/{policy-run}/`, picks first `.onnx` or `.pt` file
 3. *Wandb mode:* uses `--wandb-run` URI directly as model path
 4. Subprocess (`hscinference` env): `python modules/03_inference/holosoma_custom/run_policy.py {config} --task.model-path {model} --robot.sdk-type ros2`
@@ -335,11 +331,11 @@ python scripts/deploy.py --mode REAL --robot g1_27dof
 |---|---|---|
 | `--mode` | yes | `SIM` (simulation) or `REAL` (physical robot) |
 | `--robot` | no | Robot variant. Default: `g1_27dof`. Supported: `g1_27dof` |
-| `--deployer` | no | Config name in `cfg/deployment/`. Default: `unitree` |
+| `--deployer` | no | Config name in `cfg/04_deployment/`. Default: `unitree` |
 
 **What it does:**
 1. Validates that the conda environment and workspace exist.
-2. Reads `cfg/deployment/{deployer}.yaml` to resolve commands and environments.
+2. Reads `cfg/04_deployment/{deployer}.yaml` to resolve commands and environments.
 3. Creates a **tmux session** (`wbt-deploy-sim` or `wbt-deploy-real`) with 3 panes:
    - **Pane 0 (top-left):**
      - `SIM`: `ros2 launch unitree_simulation launch_sim.launch.py`
