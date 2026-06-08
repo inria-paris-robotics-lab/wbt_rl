@@ -17,7 +17,7 @@ raw_datasets:
     body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
 
   OMOMO_NEW:
-    path: data/00_raw_datasets/OMOMO_new
+    path: data/00_raw_datasets/OMOMO_new/OMOMO_new
 
 output:
   retargeted_motions: data/01_retargeted_motions

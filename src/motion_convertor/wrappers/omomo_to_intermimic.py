@@ -13,10 +13,10 @@ Usage:
     python src/motion_convertor/wrappers/omomo_to_intermimic.py \\
         --seq_name sub3_largebox_003 \\
         --pickle_file /path/to/train_diffusion_manip_seq_joints24.p \\
-        --smplh_pkl_dir  /path/to/OMOMO/smplx/smplh      \\
-        --smplh_npz_root /path/to/OMOMO/smplh             \\
-        --smplx_path     /path/to/SFU/models_smplx_v1_1/models/smplx \\
-        --object_path    /path/to/OMOMO/data/captured_objects \\
+        --smplh_pkl_dir  data/00_raw_datasets/models/smplh \\
+        --smplh_npz_root data/00_raw_datasets/models/smplh \\
+        --smplx_path     data/00_raw_datasets/models/models_smplx_v1_1/models/smplx \\
+        --object_path    data/00_raw_datasets/OMOMO/data/captured_objects \\
         --output         /path/to/output/sub3_largebox_003.pt
 
 Runs in interact env.
