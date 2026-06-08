@@ -79,6 +79,13 @@ install_unitree_control_interface() {
 
   (
     set +u
+    # Activate the env (not just prepend PATH) so conda's gcc/gxx/binutils
+    # activate.d scripts export LDFLAGS/CPPFLAGS/CMAKE_PREFIX_PATH pointing at
+    # $ENV_ROOT/lib (with -L and -rpath-link). Without them the cyclonedds link
+    # fails to find libssl.so.3, libcrypto.so.3, libstdc++.so.6 and
+    # libiceoryx_binding_c.so even though they are present in the env.
+    source "$WBT_CONDA_ROOT/etc/profile.d/conda.sh"
+    conda activate "$ENV_ROOT"
     export PATH="$ENV_ROOT/bin:$PATH"
     export Python_ROOT_DIR="$ENV_ROOT"
     export Python3_ROOT_DIR="$ENV_ROOT"
