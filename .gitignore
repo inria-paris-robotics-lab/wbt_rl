@@ -1,0 +1,41 @@
+# Raw dataset contents (keep LAFAN/OMOMO/SFU folders, ignore their contents)
+data/00_raw_datasets/LAFAN/*
+!data/00_raw_datasets/LAFAN/.gitkeep
+data/00_raw_datasets/OMOMO/*
+!data/00_raw_datasets/OMOMO/.gitkeep
+data/00_raw_datasets/SFU/*
+!data/00_raw_datasets/SFU/.gitkeep
+data/00_raw_datasets/models/*
+!data/00_raw_datasets/models/.gitkeep
+
+data/00_raw_datasets/OMOMO_new/*
+
+data/01_retargeted_motions/*
+!data/01_retargeted_motions/README.md
+
+data/02_policies/*
+!data/02_policies/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+dist/
+build/
+tea_debug.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.pytest_cache/
+docs/
