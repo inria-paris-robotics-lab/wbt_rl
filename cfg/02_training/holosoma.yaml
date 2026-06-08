@@ -21,14 +21,8 @@ simulators:
     cmd: python modules/02_training/holosoma/train_agent.py
     extra_args: simulator:isaacsim
 
-  mjwarp:
-    env: hsmujoco
-    setup_script: modules/third_party/holosoma/scripts/source_mujoco_setup.sh
-    cmd: python modules/02_training/holosoma/train_agent.py
-    extra_args: simulator:mjwarp
-
 # Maps (robot, simulator, algo, task_type) → holosoma exp: subcommand name.
-# WBT requires IsaacSim — IsaacGym and MJWarp are not supported (asserted in wbt_manager.py).
+# WBT requires IsaacSim — IsaacGym is not supported (asserted in wbt_manager.py).
 # Unsupported simulator → error before subprocess is launched.
 robot_exp_map:
   G1_29dof:
