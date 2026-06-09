@@ -149,7 +149,8 @@ python scripts/train.py \
     [--object-urdf /path/to/object.urdf] \              # override object URDF (auto-resolved from retarget config.yaml if absent)
     [--retarget-run latest] \                           # run ID or 'latest' (default: latest)
     [--num-envs 4096] \
-    [--checkpoint path/to/ckpt.pt]
+    [--checkpoint path/to/ckpt.pt] \
+    [--no-video]                                        # disable video recording during training
 ```
 
 **`--retarget-task-type` vs `--with-object` / `--with-object-actor`** — these flags are independent:
@@ -201,7 +202,8 @@ python scripts/train.py \
     --robot G1_29dof \
     --retargeter holosoma \
     --trainer holosoma \
-    --simulator isaacsim
+    --simulator isaacsim \
+    --no-video
 
 # LAFAN — holosoma, G1_29dof, isaacsim, Fast-SAC, wandb offline
 python scripts/train.py \
@@ -211,7 +213,8 @@ python scripts/train.py \
     --trainer holosoma \
     --simulator isaacsim \
     --algo fast_sac \
-    --logger-type wandb_offline
+    --logger-type wandb_offline \
+    --no-video
 
 # OMOMO_NEW — retargeted with object, trained without object (decoupled)
 python scripts/train.py \
@@ -220,7 +223,8 @@ python scripts/train.py \
     --retargeter holosoma_custom \
     --trainer holosoma_custom \
     --simulator isaacsim \
-    --retarget-task-type object_interaction
+    --retarget-task-type object_interaction \
+    --no-video
     # no --with-object → robot-only training on object-interaction retargeted data
 
 # OMOMO_NEW — retargeted with custom object, trained with object
@@ -233,7 +237,8 @@ python scripts/train.py \
     --simulator isaacsim \
     --retarget-task-type object_interaction \
     --with-object \
-    --algo fast_sac
+    --algo fast_sac \
+    --no-video
     # --object-urdf is optional: auto-filled from retarget run config.yaml
 
 # OMOMO — retargeted with object, trained with object, explicit URDF override
@@ -245,7 +250,8 @@ python scripts/train.py \
     --simulator isaacsim \
     --retarget-task-type object_interaction \
     --with-object \
-    --object-urdf /path/to/my_object.urdf
+    --object-urdf /path/to/my_object.urdf \
+    --no-video
 
 # OMOMO_NEW — object pose exposed to actor (PPO only)
 python scripts/train.py \
@@ -255,7 +261,8 @@ python scripts/train.py \
     --trainer holosoma_custom \
     --simulator isaacsim \
     --retarget-task-type object_interaction \
-    --with-object-actor
+    --with-object-actor \
+    --no-video
 
 # SFU — holosoma_custom, Fast-SAC, resume from checkpoint
 python scripts/train.py \
@@ -265,7 +272,8 @@ python scripts/train.py \
     --trainer holosoma_custom \
     --simulator isaacsim \
     --algo fast_sac \
-    --checkpoint data/02_policies/SFU_G1_29dof/holosoma_custom_holosoma_custom/latest/checkpoint.pt
+    --checkpoint data/02_policies/SFU_G1_29dof/holosoma_custom_holosoma_custom/latest/checkpoint.pt \
+    --no-video
 ```
 
 ---

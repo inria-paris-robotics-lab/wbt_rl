@@ -217,6 +217,7 @@ def run_training(
     checkpoint: str | None,
     object_urdf: str | None = None,
     with_object_actor: bool = False,
+    no_video: bool = False,
 ) -> None:
     """Launch the trainer subprocess."""
     sim_cfg = cfg["simulators"][simulator]
@@ -251,6 +252,8 @@ def run_training(
         cmd += f" {arg_map['checkpoint']} {checkpoint}"
     if object_urdf and "object_urdf" in arg_map:
         cmd += f" {arg_map['object_urdf']} {object_urdf}"
+    if no_video:
+        cmd += " --logger.video.enabled False"
 
     conda_run(env, cmd, cwd=repo_root(), interactive=True, env_vars=env_vars)
 
@@ -292,6 +295,8 @@ def main():
     parser.add_argument("--object-urdf", default=None,
                         help="Path to a custom object URDF (overrides the one hardcoded in the exp preset)."
                              " Only used when --with-object is set.")
+    parser.add_argument("--no-video", action="store_true",
+                        help="Disable video recording during training (sets --logger.video.enabled False).")
     args = parser.parse_args()
 
     dataset = args.dataset.upper()
@@ -341,7 +346,8 @@ def main():
     print(f"Launching {trainer} training ({args.simulator}, {robot}, {args.algo}, {task_label}, logger:{logger_type})...")
     run_training(cfg, args.simulator, trainer_inputs, policy_run_dir, robot,
                  args.algo, with_object, logger_type, args.num_envs, args.checkpoint,
-                 object_urdf=object_urdf, with_object_actor=with_object_actor)
+                 object_urdf=object_urdf, with_object_actor=with_object_actor,
+                 no_video=args.no_video)
 
     # Write config snapshot
     with open(policy_run_dir / "config.yaml", "w") as f:
@@ -359,6 +365,7 @@ def main():
             "retarget_run": str(retarget_run),
             "num_envs": args.num_envs,
             "object_urdf": object_urdf,
+            "no_video": args.no_video,
         }, f)
 
     # Update latest symlink
