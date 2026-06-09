@@ -98,6 +98,7 @@ def prepare_trainer_inputs(retarget_run: Path, retargeter: str, trainer: str, ro
     task_type = run_cfg.get("task_type", "robot_only")
     run_object_name = run_cfg.get("object_name", "ground")
     run_object_urdf = run_cfg.get("object_urdf", None)
+    run_object_scale = run_cfg.get("object_scale", None)
 
     # When training robot_only on an object_interaction retarget run, strip object data
     # by using "ground" as the object name (MuJoCo bridge omits --has-dynamic-object).
@@ -157,7 +158,7 @@ def prepare_trainer_inputs(retarget_run: Path, retargeter: str, trainer: str, ro
 
         trainer_input_paths.append(trainer_input_path)
 
-    return trainer_input_paths, run_object_urdf
+    return trainer_input_paths, run_object_urdf, run_object_scale
 
 
 def _resolve_exp_name(cfg: dict, robot: str, simulator: str, algo: str, with_object: bool,
@@ -319,12 +320,19 @@ def main():
 
     # Prepare trainer inputs
     print("Preparing trainer inputs...")
-    trainer_inputs, run_object_urdf = prepare_trainer_inputs(retarget_run, retargeter, trainer, robot,
-                                                             with_object=with_object)
+    trainer_inputs, run_object_urdf, run_object_scale = prepare_trainer_inputs(
+        retarget_run, retargeter, trainer, robot, with_object=with_object)
     print(f"  {len(trainer_inputs)} sequences ready")
 
     # object_urdf: CLI flag takes precedence, retarget run config.yaml is the fallback
     object_urdf = args.object_urdf or run_object_urdf
+    object_scale = run_object_scale or 1.0
+
+    # If path points to a .obj mesh, generate a URDF from it on the fly
+    if object_urdf and Path(object_urdf).suffix.lower() == ".obj":
+        from motion_convertor._obj_to_urdf import obj_to_urdf
+        object_urdf = str(obj_to_urdf(object_urdf, scale=object_scale))
+        print(f"  [obj→urdf] scale={object_scale:.4f} → {object_urdf}")
 
     # Create policy run directory
     policies_base = output_path("policies")

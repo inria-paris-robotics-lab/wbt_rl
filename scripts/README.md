@@ -54,7 +54,7 @@ python scripts/retarget.py \
     [--sequences seq1 seq2 ...]    # optional, defaults to all sequences
     [--run-id run_20240301_120000] # optional, resumes an existing run
     [--task-type robot_only|object_interaction]  # OMOMO only, default: robot_only
-    [--object-urdf /path/to/object.urdf]         # object_interaction only — saved in config.yaml for train.py
+    [--object-urdf /path/to/object.obj]          # object_interaction only — .obj path saved in config.yaml; scale auto-looked up from OMOMO data
     [--visualize]
 ```
 
@@ -67,7 +67,7 @@ python scripts/retarget.py \
    - `motion_convertor.to_unified_input()` → `{seq}_input_unified.npz`
    - subprocess (module env) → runs retargeter → `{seq}_output_raw.{ext}`
    - `motion_convertor.to_unified_output()` → `{seq}_output_unified.npz`
-5. Writes `config.yaml` (full CLI args snapshot, includes `object_urdf` when provided)
+5. Writes `config.yaml` (full CLI args snapshot, includes `object_urdf` and `object_scale` when `object_interaction`; scale is looked up from OMOMO data by object name)
 6. Updates `latest →` symlink
 
 **Output** — `data/01_retargeted_motions/{dataset}_{robot}/{retargeter}/run_{timestamp}/`:
@@ -76,7 +76,7 @@ python scripts/retarget.py \
 {seq}_input_unified.npz
 {seq}_output_raw.{ext}
 {seq}_output_unified.npz
-config.yaml          ← includes object_urdf path if --object-urdf was passed
+config.yaml          ← includes object_urdf (.obj path) and object_scale if object_interaction
 ```
 
 **Supported robot/retargeter combinations:**
@@ -116,13 +116,14 @@ python scripts/retarget.py \
     --sequences 0005_2FeetJump001_stageii \
     --visualize
 
-# OMOMO_NEW — holosoma_custom, object_interaction, G1_27dof, custom object URDF
+# OMOMO_NEW — holosoma_custom, object_interaction, G1_27dof
+# --object-urdf accepts a .obj path: the URDF is generated on the fly at training time
 python scripts/retarget.py \
     --dataset OMOMO_NEW \
     --robot G1_27dof \
     --retargeter holosoma_custom \
     --task-type object_interaction \
-    --object-urdf /path/to/my_object.urdf \
+    --object-urdf data/00_raw_datasets/OMOMO/data/captured_objects/largebox_cleaned_simplified.obj \
     --sequences sub3_largebox_003 \
     --visualize
 ```
@@ -146,7 +147,7 @@ python scripts/train.py \
     [--retarget-task-type robot_only|object_interaction]  # which retarget run to use as source (default: robot_only)
     [--with-object] \                                   # train with object — object pose in critic only (default: robot-only)
     [--with-object-actor] \                             # train with object — object pose in both actor and critic obs (PPO only; implies --with-object)
-    [--object-urdf /path/to/object.urdf] \              # override object URDF (auto-resolved from retarget config.yaml if absent)
+    [--object-urdf /path/to/object.obj] \               # object mesh (.obj → URDF generated on the fly); read from retarget config.yaml if absent
     [--retarget-run latest] \                           # run ID or 'latest' (default: latest)
     [--num-envs 4096] \
     [--checkpoint path/to/ckpt.pt] \
@@ -170,7 +171,7 @@ python scripts/train.py \
    - OMOMO robot_only: `OMOMO_robot_{robot}/{retargeter}/`
    - OMOMO object_interaction: `OMOMO_object_{robot}/{retargeter}/`
    - OMOMO_NEW: always `OMOMO_new_object_{robot}/{retargeter}/`
-4. Reads `object_urdf` from the retarget run `config.yaml` (set by `retarget.py --object-urdf`); `--object-urdf` on this script takes precedence
+4. Reads `object_urdf` (.obj path) and `object_scale` from the retarget run `config.yaml`; `--object-urdf` on this script takes precedence. If the path is a `.obj`, a URDF is generated on the fly next to the mesh file using the stored scale.
 5. For each sequence:
    - `motion_convertor.to_trainer_input()` → `{seq}_trainer_input.npz` (with object) or `{seq}_robot_only_trainer_input.npz` (without object, when `--retarget-task-type object_interaction` but no `--with-object`)
 6. subprocess (trainer env) → runs training:
@@ -227,8 +228,8 @@ python scripts/train.py \
     --no-video
     # no --with-object → robot-only training on object-interaction retargeted data
 
-# OMOMO_NEW — retargeted with custom object, trained with object
-# object_urdf is auto-resolved from the retarget run config.yaml (set via retarget.py --object-urdf)
+# OMOMO_NEW — retargeted with object, trained with object
+# .obj path is read from the retarget run config.yaml; URDF is generated on the fly
 python scripts/train.py \
     --dataset OMOMO_NEW \
     --robot G1_27dof \
@@ -238,19 +239,6 @@ python scripts/train.py \
     --retarget-task-type object_interaction \
     --with-object \
     --algo fast_sac \
-    --no-video
-    # --object-urdf is optional: auto-filled from retarget run config.yaml
-
-# OMOMO — retargeted with object, trained with object, explicit URDF override
-python scripts/train.py \
-    --dataset OMOMO \
-    --robot G1_27dof \
-    --retargeter holosoma_custom \
-    --trainer holosoma_custom \
-    --simulator isaacsim \
-    --retarget-task-type object_interaction \
-    --with-object \
-    --object-urdf /path/to/my_object.urdf \
     --no-video
 
 # OMOMO_NEW — object pose exposed to actor (PPO only)

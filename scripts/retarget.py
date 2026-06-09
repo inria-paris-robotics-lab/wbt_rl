@@ -269,6 +269,30 @@ def _run_retargeter(
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Object scale helpers
+# ---------------------------------------------------------------------------
+
+def _lookup_omomo_obj_scale(object_name: str) -> float | None:
+    """Read the mean obj_scale for a given object from the OMOMO training pickle."""
+    try:
+        import joblib
+        import numpy as np
+        p_file = dataset_path("OMOMO") / "train_diffusion_manip_seq_joints24.p"
+        if not p_file.exists():
+            return None
+        data = joblib.load(p_file)
+        scales = [
+            float(data[i]["obj_scale"].mean())
+            for i in data
+            if object_name in data[i].get("seq_name", "")
+        ]
+        return float(np.mean(scales)) if scales else None
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -358,14 +382,17 @@ def main():
 
     config_out = run_dir / "config.yaml"
     object_name = "ground"
+    object_scale = None
     if task_type == "object_interaction":
         object_name = "largebox"
+        object_scale = _lookup_omomo_obj_scale(object_name)
 
     with open(config_out, "w") as f:
         yaml.dump({
             "dataset": dataset, "robot": robot, "retargeter": retargeter,
             "task_type": task_type, "object_name": object_name,
             "object_urdf": args.object_urdf,
+            "object_scale": object_scale,
             "run_dir": str(run_dir), "sequences": args.sequences,
         }, f)
 
