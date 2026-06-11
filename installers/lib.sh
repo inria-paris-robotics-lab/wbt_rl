@@ -5,10 +5,12 @@ REPO_ROOT="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &>/dev/null && pwd 
 GMR_DIR="$REPO_ROOT/modules/01_retargeting/GMR"
 HOLOSOMA_SCRIPTS="$REPO_ROOT/modules/third_party/holosoma_custom/scripts"
 TEST_PIPE_SCRIPTS="$REPO_ROOT/modules/third_party/test_pipe/scripts"
+HOLONEW_SCRIPTS="$REPO_ROOT/modules/01_retargeting/HoloNew/scripts"
 
 WBT_CONDA_ROOT="$HOME/.wbt_deps/miniconda3"
 HOLOSOMA_CONDA_ROOT="$HOME/.holosoma_deps/miniconda3"
 TEST_PIPE_CONDA_ROOT="$HOME/.test_pipe_deps/miniconda3"
+HOLONEW_CONDA_ROOT="$HOME/.holonew_deps/miniconda3"
 
 _header() { echo ""; echo "══════════════════════════════════════════"; echo "  $1"; echo "══════════════════════════════════════════"; }
 _ok()     { echo "  ✓ $1"; }
@@ -174,4 +176,52 @@ FAKESUDO
     PATH="$fake_dir:$PATH" \
     bash "$script" "$@"
   rm -rf "$fake_dir"
+}
+
+_holonew_prep_env() {
+  local env_name="$1" python_ver="$2"; shift 2
+  local env_root="$HOLONEW_CONDA_ROOT/envs/$env_name"
+
+  if [[ ! -d "$env_root" ]]; then
+    _ensure_conda "$HOLONEW_CONDA_ROOT" "$HOME/.holonew_deps"
+    "$HOLONEW_CONDA_ROOT/bin/mamba" create -y --prefix "$env_root" \
+      python="$python_ver" "$@" -c conda-forge --override-channels
+  fi
+
+  [[ -f "$env_root/bin/uv" ]] || "$env_root/bin/python" -m pip install uv
+
+  local uv_bin="$env_root/bin/uv"
+  cat > "$env_root/bin/pip" <<PIPSHIM
+#!/usr/bin/env bash
+# Delegates to uv pip.
+# Check if the command is install, to filter "pip install pip"
+if [[ "\$1" == "install" ]]; then
+  only_pip=1
+  for a in "\${@:2}"; do
+    if [[ -n "\$a" ]]; then
+        [[ "\$a" =~ ^- ]] && continue
+        [[ "\$a" =~ ^pip([>=<!@].*)?$ ]] && continue
+        only_pip=0; break
+    fi
+  done
+  [[ \$only_pip -eq 1 ]] && exit 0
+
+  args=()
+  for arg in "\$@"; do
+    [[ -n "\$arg" ]] && args+=("\$arg")
+  done
+  exec "$uv_bin" pip install "\${args[@]:1}"
+else
+  exec "$uv_bin" pip "\$@"
+fi
+PIPSHIM
+  chmod +x "$env_root/bin/pip"
+  ln -sf pip "$env_root/bin/pip3"
+}
+
+_holonew_run() {
+  local env_name="$1" script="$2"; shift 2
+  _clean_bash_pinned "$HOLONEW_CONDA_ROOT/envs" \
+    WORKSPACE_DIR="$HOME/.holonew_deps" \
+    bash "$script" "$@"
 }
