@@ -25,3 +25,6 @@
 [submodule "modules/third_party/test_pipe"]
 	path = modules/third_party/test_pipe
 	url = https://github.com/Guillaume-Bsst/test_pipe.git
+[submodule "modules/01_retargeting/HoloNew"]
+	path = modules/01_retargeting/HoloNew
+	url = git@github.com:Guillaume-Bsst/HoloNew.git
