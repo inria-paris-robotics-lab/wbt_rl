@@ -38,14 +38,16 @@ case "$TARGET" in
     elif [[ -f "$INSTALLERS/modules/$TARGET.sh" ]]; then bash "$INSTALLERS/modules/$TARGET.sh" "$@"
     else
       echo "Unknown target: $TARGET" >&2
-      echo "Usage: $0 [all|wbt|interact|gmr|holosoma_retargeting|holosoma_training|holosoma_inference|unitree_control_interface|test_pipe_retargeting]" >&2
+      echo "Usage: $0 [all|wbt|interact|gmr|holosoma_retargeting|holosoma_training|holosoma_inference|unitree_control_interface|holonew_retargeting|test_pipe_retargeting]" >&2
       exit 1
     fi
     ;;
 esac
 
 echo ""
-echo "  ~/.wbt_deps/      wbt_rl, gmr, interact, unitree_control_interface"
-echo "  ~/.holosoma_deps/    holosoma_custom envs (hs*)"
-echo "  ~/.test_pipe_deps/   test_pipe envs (tp*)"
+echo "  ~/.wbt_deps/         wbt_rl, gmr, interact"
+echo "  ~/.holosoma_deps/    holosoma + holosoma_custom envs (hs*)"
+echo "  ~/.holonew_deps/     holonew env  (on-demand only)"
+echo "  ~/.test_pipe_deps/   test_pipe envs (tp*)  (on-demand only)"
+echo "  system conda:        unitree_control_interface"
 echo "  To activate: source scripts/activate_wbt.sh"

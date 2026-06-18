@@ -41,8 +41,8 @@ Then run any install target:
 
 ```bash
 ./install.sh wbt
-./install.sh inference custom
-./install.sh deployment
+./install.sh holosoma_inference
+./install.sh unitree_control_interface
 ```
 
 ## Notes

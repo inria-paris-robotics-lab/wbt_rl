@@ -315,10 +315,13 @@ Launches deployment components for WBT-RL via tmux. Orchestrates the simulator, 
 **CLI:**
 ```bash
 # Simulation mode (Gazebo + Watchdog + Bridge)
-python scripts/deploy.py --mode SIM --robot g1_27dof
+python scripts/deploy.py --mode SIM --robot g1_27dof [--g1-dof 27]
 
 # Real robot mode (Shutdown sportsmode + Watchdog + Bridge)
-python scripts/deploy.py --mode REAL --robot g1_27dof
+python scripts/deploy.py --mode REAL --robot g1_27dof [--g1-dof 27]
+
+# 29-DOF policy on 27-DOF hardware (waist_roll/pitch dropped in bridge)
+python scripts/deploy.py --mode SIM --robot g1_29dof --g1-dof 29
 ```
 
 **Arguments:**
@@ -326,7 +329,8 @@ python scripts/deploy.py --mode REAL --robot g1_27dof
 | Argument | Required | Notes |
 |---|---|---|
 | `--mode` | yes | `SIM` (simulation) or `REAL` (physical robot) |
-| `--robot` | no | Robot variant. Default: `g1_27dof`. Supported: `g1_27dof` |
+| `--robot` | no | Robot variant. Default: `g1_27dof`. Supported: `g1_27dof`, `g1_29dof` |
+| `--g1-dof` | no | Actuated DOF forwarded to watchdog (`dof:=`) and bridge (`--dof`). `27` = waist locked (mode 6); `29` = waist actuated (mode 5). Default: `27` |
 | `--deployer` | no | Config name in `cfg/04_deployment/`. Default: `unitree` |
 
 **What it does:**
@@ -334,10 +338,10 @@ python scripts/deploy.py --mode REAL --robot g1_27dof
 2. Reads `cfg/04_deployment/{deployer}.yaml` to resolve commands and environments.
 3. Creates a **tmux session** (`wbt-deploy-sim` or `wbt-deploy-real`) with 3 panes:
    - **Pane 0 (top-left):**
-     - `SIM`: `ros2 launch unitree_simulation launch_sim.launch.py`
+     - `SIM`: `ros2 launch unitree_simulation launch_sim.launch.py robot:=g1`
      - `REAL`: `ros2 run unitree_control_interface shutdown_sportsmode.py`
-   - **Pane 1 (top-right):** `ros2 launch unitree_control_interface watchdog.launch.py` (Watchdog)
-   - **Pane 2 (bottom):** `python src/ros2_bridge/holosoma_inference_custom.py` (ROS2 Bridge)
+   - **Pane 1 (top-right):** `ros2 launch unitree_control_interface watchdog.launch.py robot_type:=g1 dof:={g1_dof}` (Watchdog)
+   - **Pane 2 (bottom):** `python src/ros2_bridge/holosoma_inference_custom.py --dof {g1_dof}` (ROS2 Bridge)
 4. Each pane automatically:
    - Activates the correct conda environment (e.g., `unitree_control_interface`).
    - Sources the ROS2 workspace (`cyclonedds_ws`).

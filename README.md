@@ -61,9 +61,14 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | **GMR** | [YanjieZe/GMR](https://github.com/YanjieZe/GMR) | LAFAN1, SFU |
 | **holosoma_retargeting** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | LAFAN1, SFU, OMOMO_NEW |
 | **holosoma_retargeting_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | LAFAN1, SFU, OMOMO_NEW |
+| **HoloNew** ⚠️ | [Guillaume-Bsst/HoloNew](https://github.com/Guillaume-Bsst/HoloNew) | experimental |
 | **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
 > **OMOMO (original):** pipeline not yet working end-to-end — 🚧 in progress.
+>
+> ⚠️ **HoloNew** is a custom fork of holosoma_retargeting with its own isolated conda env (`holonew` under
+> `~/.holonew_deps/`). It ships an installer but is **not yet wired into `cfg/`**, so it cannot be used
+> through `retarget.py` yet — install on demand with `./install.sh holonew_retargeting`. 🚧 in progress.
 >
 > ⚠️ **test_pipe** is an experimental sandbox module. It is wired into `cfg/` and ships an installer, but
 > is **excluded from `./install.sh`** (install it on demand with `./install.sh test_pipe_retargeting`).
@@ -128,6 +133,7 @@ wbt_rl/
 └── modules/
     ├── 01_retargeting/
     │   ├── GMR/                            # submodule — YanjieZe/GMR
+    │   ├── HoloNew/                        # submodule — Guillaume-Bsst/HoloNew  (experimental, not yet in cfg/)
     │   ├── holosoma_retargeting            # symlink → third_party/holosoma
     │   ├── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
     │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
@@ -163,31 +169,34 @@ git submodule update --init --recursive
 ./install.sh
 ```
 
-Three isolated ecosystems, nothing touches your system conda:
+Four isolated ecosystems, nothing touches your system conda:
 
 | Ecosystem | Location | Envs |
 |-----------|----------|------|
 | wbt + GMR | `~/.wbt_deps/` | `wbt_rl`, `gmr` |
-| holosoma upstream | `~/.holosoma_deps/` | `hsretargeting`, `hsmujoco`, `hsgym`, `hssim`, `hsinference` |
-| holosoma_custom | `~/.holosoma_custom_deps/` | `hsretargeting`, `hsmujoco`, `hsgym`, `hssim`, `hsinference` |
+| holosoma (upstream + custom) | `~/.holosoma_deps/` | `hsretargeting`, `hsmujoco`, `hsgym`, `hssim`, `hsinference` |
+| HoloNew ⚠️ | `~/.holonew_deps/` | `holonew` |
 | deployment | your system conda | `unitree_control_interface` |
 
 Re-running is safe — already-installed envs are skipped via sentinel files.
 
 **Selective install:**
 ```bash
-./install.sh                        # install everything (all variants)
-./install.sh wbt                 # wbt_rl env only
-./install.sh gmr                    # GMR env only
-./install.sh interact               # InterAct env (OMOMO object_interaction)
-./install.sh retargeting            # both holosoma variants
-./install.sh retargeting upstream   # holosoma upstream only
-./install.sh retargeting custom     # holosoma_custom only
-./install.sh mujoco [upstream|custom] [--no-warp]
-./install.sh isaacgym [upstream|custom]
-./install.sh isaacsim [upstream|custom]
-./install.sh inference [upstream|custom]
-./install.sh deployment             # unitree_ros2 + unitree_control_interface
+./install.sh                                    # install everything (all variants)
+./install.sh wbt                                # wbt_rl env only
+./install.sh gmr                                # GMR env only
+./install.sh interact                           # InterAct env (OMOMO object_interaction)
+./install.sh holosoma_retargeting               # hsretargeting env (shared by holosoma + holosoma_custom)
+./install.sh holosoma_training                  # hsmujoco + hsgym + hssim envs
+./install.sh holosoma_training mujoco           # hsmujoco only
+./install.sh holosoma_training isaacsim         # hssim only
+./install.sh holosoma_training isaacgym         # hsgym only
+./install.sh holosoma_training mujoco --no-warp # mujoco without warp
+./install.sh holosoma_inference                 # hsinference env
+./install.sh unitree_control_interface          # deployment env (system conda)
+# On-demand only (excluded from full install):
+./install.sh holonew_retargeting                # HoloNew isolated env
+./install.sh test_pipe_retargeting              # test_pipe isolated env
 ```
 
 ### 3 — Install the datasets you want to use
