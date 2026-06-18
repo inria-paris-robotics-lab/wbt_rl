@@ -19,15 +19,15 @@ raw_datasets:
   OMOMO_NEW:
     path: data/00_raw_datasets/OMOMO_new/OMOMO_new
 
-  HOI-M3:
+  HODome:
     # HODome release: one {subject}_{object}.npz per sequence (single person + single object).
     # smplx/ = SMPL-X human (body_pose 63, hands, betas 10), 60 fps, Y-up.
     # object/ = per-frame object pose (object_R 3x3, object_T) -> unified object_poses (T,7).
     # scaned_object/ = object meshes; calibration_ground/ = per-date camera params.
     # Reuses the shared SMPL-X body model (same as SFU) — nothing extra to download.
-    path: data/00_raw_datasets/HOI-M3/smplx
-    objects: data/00_raw_datasets/HOI-M3/object
-    object_meshes: data/00_raw_datasets/HOI-M3/scaned_object
+    path: data/00_raw_datasets/HODome/smplx
+    objects: data/00_raw_datasets/HODome/object
+    object_meshes: data/00_raw_datasets/HODome/scaned_object
     body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
 
 output:

@@ -11,8 +11,8 @@ data/00_raw_datasets/models/*
 data/00_raw_datasets/OMOMO_new/*
 !data/00_raw_datasets/OMOMO_new/.gitkeep
 
-data/00_raw_datasets/HOI-M3/*
-!data/00_raw_datasets/HOI-M3/.gitkeep
+data/00_raw_datasets/HODome/*
+!data/00_raw_datasets/HODome/.gitkeep
 
 data/01_retargeted_motions/*
 !data/01_retargeted_motions/README.md
