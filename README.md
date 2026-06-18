@@ -65,14 +65,6 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
 > **OMOMO (original):** pipeline not yet working end-to-end — 🚧 in progress.
->
-> ⚠️ **HoloNew** is a custom fork of holosoma_retargeting with its own isolated conda env (`holonew` under
-> `~/.holonew_deps/`). It ships an installer but is **not yet wired into `cfg/`**, so it cannot be used
-> through `retarget.py` yet — install on demand with `./install.sh holonew_retargeting`. 🚧 in progress.
->
-> ⚠️ **test_pipe** is an experimental sandbox module. It is wired into `cfg/` and ships an installer, but
-> is **excluded from `./install.sh`** (install it on demand with `./install.sh test_pipe_retargeting`).
-> It reuses the holosoma data formats and is **not part of the benchmarking baseline**.
 
 ### Trainers
 
