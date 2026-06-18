@@ -24,6 +24,7 @@ Joint mapping (G1 27-DOF hardware ↔ 29-DOF policy):
   unitree[13:27] ↔  holosoma[15:29]  left arm + right arm
 """
 
+import argparse
 import threading
 
 import numpy as np
@@ -46,8 +47,11 @@ except ImportError:
 from unitree_control_interface_py import G1ControlInterface
 
 # ── Joint dimension constants ──────────────────────────────────────────────────
-N_UNITREE  = 27   # G1ControlInterface actuated DOF (waist_roll + waist_pitch are locked)
-N_HOLOSOMA = 29   # holosoma g1-29dof config DOF
+N_HOLOSOMA = 29        # canonical full G1 layout (waist_yaw=12, waist_roll=13, waist_pitch=14)
+_LOCKED_WAIST = [13, 14]   # waist_roll, waist_pitch — locked in the 27-DOF variant
+# Actuated unitree DOF (27 or 29). Overwritten from the --dof CLI arg in main();
+# the 27 default preserves the previous behaviour. Threaded from deploy.py --g1-dof.
+N_UNITREE  = 27
 
 # Joint limits in 27-DOF unitree order (from g1_default_limits.yaml) — for logging only.
 _Q_MIN = np.array([-2.5307,-0.5236,-2.7576,-0.087267,-0.88,-0.2618,
@@ -77,34 +81,50 @@ _G1_SAFE_Q  = [
 ]
 
 
-def _unitree_to_holosoma(arr: np.ndarray, n_policy: int) -> np.ndarray:
-    """Expand 27-DOF unitree array → policy DOF format.
+def _to_canon(arr: np.ndarray, n: int) -> np.ndarray:
+    """Expand an n-DOF array (27 or 29) to the 29-DOF canonical layout.
 
-    If *n_policy* is 27 the array is returned as-is.
-    If *n_policy* is 29 zeros are inserted for locked waist joints.
+    For 27 DOF the locked waist (idx 13, 14) is filled with 0.0.
     """
-    if n_policy == N_UNITREE:
-        return arr.copy()
+    arr = np.asarray(arr, dtype=float)
+    if n >= N_HOLOSOMA:
+        return arr[:N_HOLOSOMA].copy()
     out = np.zeros(N_HOLOSOMA)
-    out[:13] = arr[:13]   # left leg + right leg + waist_yaw
-    # out[13] = 0.0        # waist_roll  (locked, stays 0)
-    # out[14] = 0.0        # waist_pitch (locked, stays 0)
-    out[15:] = arr[13:]   # left arm + right arm
+    out[:13] = arr[:13]    # left leg + right leg + waist_yaw
+    out[15:] = arr[13:n]   # left arm + right arm (waist_roll/pitch left at 0)
     return out
+
+
+def _from_canon(arr29: np.ndarray, n: int) -> np.ndarray:
+    """Contract the 29-DOF canonical layout to an n-DOF array (27 or 29)."""
+    arr29 = np.asarray(arr29, dtype=float)
+    if n >= N_HOLOSOMA:
+        return arr29.copy()
+    return np.delete(arr29, _LOCKED_WAIST)
+
+
+def _unitree_to_holosoma(arr: np.ndarray, n_policy: int) -> np.ndarray:
+    """Map a unitree array (N_UNITREE DOF) → policy DOF format (27 or 29)."""
+    return _from_canon(_to_canon(arr, N_UNITREE), n_policy)
 
 
 def _holosoma_to_unitree(arr: np.ndarray, n_policy: int) -> np.ndarray:
-    """Contract policy DOF array → 27-DOF unitree.
+    """Map a policy DOF array (27 or 29) → unitree DOF (N_UNITREE).
 
-    If *n_policy* is 27 the array is returned as-is.
-    If *n_policy* is 29, waist_roll (idx 13) and waist_pitch (idx 14) are dropped.
+    Locked waist positions/torques are held at 0 (see _holosoma_to_unitree_gains
+    for the gains, which instead reuse the waist_yaw value so the joints stay rigid).
     """
-    if n_policy == N_UNITREE:
-        return arr.copy()
-    out = np.zeros(N_UNITREE)
-    out[:13] = arr[:13]   # left leg + right leg + waist_yaw
-    out[13:] = arr[15:]   # left arm + right arm (skip indices 13 and 14)
-    return out
+    return _from_canon(_to_canon(arr, n_policy), N_UNITREE)
+
+
+def _holosoma_to_unitree_gains(arr: np.ndarray, n_policy: int) -> np.ndarray:
+    """Like _holosoma_to_unitree but for kp/kd: when a 27-DOF policy drives a
+    29-DOF robot, the locked waist joints (idx 13, 14) inherit the waist_yaw gains
+    (idx 12) so they are held rigid at 0 instead of going limp (kp = 0)."""
+    canon = _to_canon(arr, n_policy)
+    if n_policy < N_HOLOSOMA:            # policy provides no waist_roll/pitch gains
+        canon[13] = canon[14] = canon[12]
+    return _from_canon(canon, N_UNITREE)
 
 
 class UnitreePybulletBridgeNode(Node):
@@ -153,13 +173,25 @@ class UnitreePybulletBridgeNode(Node):
         # ── command buffers (populated by holosoma policy callbacks) ─────────
         self._cmd_lock     = threading.Lock()
         # ── Command buffers — initialised with safe fallback, overwritten by startup_pose ─
-        self._cmd_q        = np.array(_G1_SAFE_Q)
+        # 27-DOF: _cmd_q was np.array(_G1_SAFE_Q) (27). Expanded to the actuated DOF
+        # (waist held at 0 when 29).
+        self._cmd_q        = _holosoma_to_unitree(np.array(_G1_SAFE_Q), 27)
         self._cmd_dq       = np.zeros(N_UNITREE)
         self._cmd_tau      = np.zeros(N_UNITREE)
         self._kp           = np.full(N_UNITREE, 75.0)   # matches Kp_static
         self._kd           = np.full(N_UNITREE,  1.0)   # matches Kd_static
         self._cmd_received = False
         self._n_policy: int = 0
+
+        # Watchdog limits & joint names in unitree order, sized to the actuated DOF
+        # (logging only). 27-DOF: were the module-level _Q_MIN/_Q_MAX/_JOINT_NAMES_27.
+        # For 29-DOF, insert waist_roll/pitch (±0.52) at idx 13, 14.
+        if N_UNITREE == N_HOLOSOMA:
+            self._q_min = np.insert(_Q_MIN, 13, [-0.52, -0.52])
+            self._q_max = np.insert(_Q_MAX, 13, [0.52, 0.52])
+            self._names = _JOINT_NAMES_27[:13] + ["waist_roll", "waist_pitch"] + _JOINT_NAMES_27[13:]
+        else:
+            self._q_min, self._q_max, self._names = _Q_MIN, _Q_MAX, _JOINT_NAMES_27
 
         self.create_subscription(JointState, "/holosoma/low_cmd",  self._low_cmd_cb,  10)
         self.create_subscription(JointState, "/holosoma/pd_gains", self._pd_gains_cb, 10)
@@ -176,7 +208,7 @@ class UnitreePybulletBridgeNode(Node):
         self.create_subscription(Bool, "/watchdog/is_safe", self._watchdog_patch_cb, watchdog_qos)
 
         # ── G1ControlInterface (handles watchdog, safety, start routine) ─────
-        self._robot_if = G1ControlInterface(self)
+        self._robot_if = G1ControlInterface(self, dof=N_UNITREE)
         self._robot_if.register_callback(self._joint_state_cb)
         self._unlocked = False
 
@@ -225,7 +257,7 @@ class UnitreePybulletBridgeNode(Node):
             pass
 
         # Log actual joint positions that exceed watchdog limits
-        for i, (q_i, qmin, qmax, name) in enumerate(zip(q, _Q_MIN, _Q_MAX, _JOINT_NAMES_27)):
+        for i, (q_i, qmin, qmax, name) in enumerate(zip(q, self._q_min, self._q_max, self._names)):
             if q_i < qmin or q_i > qmax:
                 logger.warning(f"Actual q out of limits: {name}[{i}] = {q_i:.4f} (limits [{qmin:.4f}, {qmax:.4f}])")
 
@@ -256,7 +288,8 @@ class UnitreePybulletBridgeNode(Node):
 
         state_msg = JointState()
         state_msg.header.stamp = now
-        state_msg.name         = self._JOINT_NAMES_27 if n_pol == N_UNITREE else self._JOINT_NAMES_29
+        # Names follow the POLICY DOF (n_pol), independent of the unitree DOF.
+        state_msg.name         = self._JOINT_NAMES_29 if n_pol >= N_HOLOSOMA else self._JOINT_NAMES_27
         state_msg.position     = _unitree_to_holosoma(q_np, n_pol).tolist()
         state_msg.velocity     = _unitree_to_holosoma(dq_np, n_pol).tolist()
         self._state_pub.publish(state_msg)
@@ -312,13 +345,12 @@ class UnitreePybulletBridgeNode(Node):
         """Auto-detect policy DOF from the first message and log it once."""
         if self._n_policy:
             return self._n_policy
-        if n_values <= N_UNITREE:
-            self._n_policy = N_UNITREE
-        else:
-            self._n_policy = N_HOLOSOMA
+        # Policy DOF (27 base / 29 pro) is detected from the message length and is
+        # independent of the unitree actuated DOF (N_UNITREE).
+        self._n_policy = N_HOLOSOMA if n_values >= N_HOLOSOMA else 27
         logger.info(
             f"Policy DOF auto-detected: {self._n_policy} "
-            f"({'G1 base 27-DOF' if self._n_policy == N_UNITREE else 'G1 pro 29-DOF'})"
+            f"({'G1 pro 29-DOF' if self._n_policy >= N_HOLOSOMA else 'G1 base 27-DOF'})"
         )
         return self._n_policy
 
@@ -333,7 +365,7 @@ class UnitreePybulletBridgeNode(Node):
             self._cmd_q = _holosoma_to_unitree(h_q, n_pol)
 
             # Log any q_target that exceeds watchdog limits
-            for i, (q, qmin, qmax, name) in enumerate(zip(self._cmd_q, _Q_MIN, _Q_MAX, _JOINT_NAMES_27)):
+            for i, (q, qmin, qmax, name) in enumerate(zip(self._cmd_q, self._q_min, self._q_max, self._names)):
                 if q < qmin or q > qmax:
                     logger.warning(f"Policy q_target out of limits: {name}[{i}] = {q:.4f} (limits [{qmin:.4f}, {qmax:.4f}])")
 
@@ -358,15 +390,15 @@ class UnitreePybulletBridgeNode(Node):
         n = len(msg.position)
         if n == 0:
             return
-        n_pol = N_UNITREE if n <= N_UNITREE else N_HOLOSOMA
+        n_pol = N_HOLOSOMA if n >= N_HOLOSOMA else 27
         if not self._n_policy:
             self._n_policy = n_pol
         h_pos = np.array(msg.position[:n_pol])
         h_kp  = np.array(msg.velocity[:n_pol]) if msg.velocity else np.full(n_pol, 75.0)
         h_kd  = np.array(msg.effort[:n_pol])   if msg.effort   else np.full(n_pol,  1.0)
         self._startup_q  = _holosoma_to_unitree(h_pos, n_pol)
-        self._startup_kp = _holosoma_to_unitree(h_kp,  n_pol)
-        self._startup_kd = _holosoma_to_unitree(h_kd,  n_pol)
+        self._startup_kp = _holosoma_to_unitree_gains(h_kp, n_pol)
+        self._startup_kd = _holosoma_to_unitree_gains(h_kd, n_pol)
         logger.info(
             f"Startup pose received ({n_pol} DOF): "
             f"q_legs={self._startup_q[:6].tolist()}, "
@@ -405,15 +437,24 @@ class UnitreePybulletBridgeNode(Node):
                 h_kp = np.zeros(n_pol)
                 n = min(len(msg.position), n_pol)
                 h_kp[:n] = msg.position[:n]
-                self._kp = _holosoma_to_unitree(h_kp, n_pol)
+                self._kp = _holosoma_to_unitree_gains(h_kp, n_pol)
             if msg.velocity:
                 h_kd = np.zeros(n_pol)
                 nv = min(len(msg.velocity), n_pol)
                 h_kd[:nv] = msg.velocity[:nv]
-                self._kd = _holosoma_to_unitree(h_kd, n_pol)
+                self._kd = _holosoma_to_unitree_gains(h_kd, n_pol)
 
 
 def main():
+    parser = argparse.ArgumentParser(description="unitree_simulation <-> holosoma inference bridge")
+    parser.add_argument(
+        "--dof", type=int, choices=[27, 29], default=27,
+        help="Actuated unitree DOF: 27 (waist_roll/pitch locked, mode_machine=6) or 29 (mode 5).",
+    )
+    args, _ = parser.parse_known_args()
+    global N_UNITREE
+    N_UNITREE = args.dof
+
     rclpy.init()
     node = UnitreePybulletBridgeNode()
     rclpy.spin(node)

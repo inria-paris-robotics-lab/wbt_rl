@@ -15,9 +15,12 @@ entry_points:
     cmd: ros2 launch unitree_control_interface watchdog.launch.py
     args:
       robot_type: robot_type:=
+      dof: "dof:="
 
   bridge:
     cmd: python {repo_root}/src/ros2_bridge/holosoma_inference_custom.py
+    args:
+      dof: "--dof "
 
   shutdown_sportsmode:
     cmd: ros2 run unitree_control_interface shutdown_sportsmode.py

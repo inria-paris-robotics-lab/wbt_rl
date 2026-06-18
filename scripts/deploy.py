@@ -23,6 +23,7 @@ _ROBOT_SUBNET = "192.168.123"
 
 _ROBOT_MAP = {
     "g1_27dof": "g1",
+    "g1_29dof": "g1",
 }
 
 _DDS_MODE = {
@@ -87,7 +88,7 @@ def _load_cfg(deployer: str) -> dict:
     return yaml.safe_load(cfg_path.read_text())
 
 
-def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str) -> str:
+def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int) -> str:
     cmd = ep["cmd"].replace("{repo_root}", str(repo_root()))
     args_map = ep.get("args", {})
     defaults = ep.get("defaults", {})
@@ -95,6 +96,8 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str) -> str:
     for wbt_arg, ros2_prefix in args_map.items():
         if wbt_arg in ("robot", "robot_type"):
             arg_parts.append(f"{ros2_prefix}{robot_ros2}")
+        elif wbt_arg == "dof":
+            arg_parts.append(f"{ros2_prefix}{g1_dof}")
         elif wbt_arg in defaults:
             arg_parts.append(f"{ros2_prefix}{defaults[wbt_arg]}")
     if arg_parts:
@@ -102,7 +105,7 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str) -> str:
     return f"{preamble} && {cmd}"
 
 
-def _pane_defs(mode: str, cfg: dict, robot_ros2: str) -> list[dict]:
+def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int) -> list[dict]:
     env = cfg["env"]
     cws = cfg["cyclonedds_ws"]
     dds = _DDS_MODE[mode]
@@ -111,14 +114,14 @@ def _pane_defs(mode: str, cfg: dict, robot_ros2: str) -> list[dict]:
 
     if mode == "SIM":
         return [
-            {"name": "sim",      "cmd": _build_pane_cmd(eps["sim"],      robot_ros2, preamble)},
-            {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"], robot_ros2, preamble)},
-            {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],   robot_ros2, preamble)},
+            {"name": "sim",      "cmd": _build_pane_cmd(eps["sim"],      robot_ros2, preamble, g1_dof)},
+            {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"], robot_ros2, preamble, g1_dof)},
+            {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],   robot_ros2, preamble, g1_dof)},
         ]
     return [
-        {"name": "shutdown", "cmd": _build_pane_cmd(eps["shutdown_sportsmode"], robot_ros2, preamble)},
-        {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"],            robot_ros2, preamble)},
-        {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],              robot_ros2, preamble)},
+        {"name": "shutdown", "cmd": _build_pane_cmd(eps["shutdown_sportsmode"], robot_ros2, preamble, g1_dof)},
+        {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"],            robot_ros2, preamble, g1_dof)},
+        {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],              robot_ros2, preamble, g1_dof)},
     ]
 
 
@@ -165,6 +168,9 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="SIM: simulator+watchdog+bridge. REAL: shutdown+watchdog+bridge.")
     parser.add_argument("--robot", default="g1_27dof",
                         help="Robot variant (default: g1_27dof)")
+    parser.add_argument("--g1-dof", type=int, choices=[27, 29], default=27, dest="g1_dof",
+                        help="Actuated G1 DOF threaded to watchdog (dof:=) and bridge (--dof). "
+                             "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). Default 27.")
     parser.add_argument("--deployer", default="unitree",
                         help="Deployer config — matches cfg/04_deployment/{deployer}.yaml (default: unitree)")
     return parser
@@ -183,7 +189,7 @@ def main():
 
     robot_ros2 = _robot_to_ros2(args.robot)
     cfg = _load_cfg(args.deployer)
-    panes = _pane_defs(args.mode, cfg, robot_ros2)
+    panes = _pane_defs(args.mode, cfg, robot_ros2, args.g1_dof)
     session_name = f"wbt-deploy-{args.mode.lower()}"
 
     print(f"Launching {args.mode} deployment (tmux session: {session_name})")
