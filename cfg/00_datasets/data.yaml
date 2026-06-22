@@ -30,6 +30,19 @@ raw_datasets:
     object_meshes: data/00_raw_datasets/HODome/scaned_object
     body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
 
+  HOI-M3:
+    # HOI-M3 "ground" release: multi-scene human-object interaction (living/bed/office/dining/fitness rooms).
+    # mocap_ground/ = per-sequence {scene}_data{NN}_human.npz (SMPL-X human) +
+    #   {scene}_data{NN}_object.npz (per-frame object 6DoF) in the SAME folder, split by suffix.
+    # scanned_object/ = ~86 object meshes; calibration_ground/{date}/calibration.json = per-date camera params.
+    # dataset_information.json maps capture date -> sequences; object_index.json lists object classes.
+    # Reuses the shared SMPL-X body model (same as SFU/HODome) — nothing extra to download.
+    path: data/00_raw_datasets/HOI-M3/mocap_ground
+    objects: data/00_raw_datasets/HOI-M3/mocap_ground
+    object_meshes: data/00_raw_datasets/HOI-M3/scanned_object
+    calibration: data/00_raw_datasets/HOI-M3/calibration_ground
+    body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
+
 output:
   retargeted_motions: data/01_retargeted_motions
   policies:           data/02_policies

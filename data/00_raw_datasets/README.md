@@ -4,7 +4,7 @@ Raw datasets and body models to download before running the pipeline. No process
 acquisition. All paths below are resolved from [`cfg/00_datasets/data.yaml`](../../cfg/00_datasets/data.yaml);
 edit that file if your data lives elsewhere.
 
-Five folders sit alongside this README:
+The folders below sit alongside this README:
 
 | Folder | Contents | Used by |
 |--------|----------|---------|
@@ -12,7 +12,9 @@ Five folders sit alongside this README:
 | `SFU/`      | SFU AMASS `.npz` motions | SFU |
 | `OMOMO/`    | OMOMO sequences + objects | OMOMO (original) |
 | `OMOMO_new/`| InterMimic-processed OMOMO `.pt` | OMOMO_NEW |
-| `models/`   | **Shared body models** (SMPL-X, SMPL+H, MANO, DMPL) | SFU, OMOMO |
+| `HODome/`   | HODome SMPL-X human + single-object poses/meshes | HODome |
+| `HOI-M3/`   | HOI-M3 "ground" SMPL-X human + object poses/meshes | HOI-M3 |
+| `models/`   | **Shared body models** (SMPL-X, SMPL+H, MANO, DMPL) | SFU, OMOMO, HODome, HOI-M3 |
 
 Body models are **centralised in `models/`** and shared across datasets — they are not duplicated under each
 dataset folder.
@@ -93,6 +95,45 @@ OMOMO_new/
 
 1. Download the processed OMOMO data from [this link](https://drive.google.com/file/d/141YoPOd2DlJ4jhU2cpZO5VU5GzV_lm5j/view)
 2. Extract so the `.pt` files land in `OMOMO_new/OMOMO_new/`
+
+---
+
+## HODome/
+
+HODome release — single person + single object per sequence (`{subject}_{object}`). Reuses the shared
+**SMPL-X** body model under `models/` (nothing extra to download).
+
+```
+HODome/
+├── smplx/                       # SMPL-X human, one {subject}_{object}.npz (+ _meta.json) per sequence
+├── object/                      # per-frame object 6DoF, one {subject}_{object}.npz per sequence
+├── scaned_object/               # object meshes, one {object}.tar each
+├── calibration_ground/{date}/   # per-date camera params
+├── dataset_information.json      # date -> sequence list
+└── startframe.json              # per-sequence start frames
+```
+
+---
+
+## HOI-M3/
+
+HOI-M3 **"ground"** release — multi-scene human-object interaction (living/bed/office/dining/fitness
+rooms). Reuses the shared **SMPL-X** body model under `models/` (nothing extra to download).
+
+```
+HOI-M3/
+├── mocap_ground/                # 204 {scene}_data{NN}_human.npz  (SMPL-X human)
+│                                # 177 {scene}_data{NN}_object.npz (per-frame object 6DoF) — same folder, split by suffix
+├── scanned_object/{object}/     # ~86 object meshes (.obj + textures)
+├── calibration_ground/{date}/   # per-date camera params (calibration.json), 8 dates
+├── dataset_information.json      # capture date -> sequence list
+└── object_index.json            # object class list
+```
+
+1. Download the HOI-M3 "ground" archives (`calibration_ground*.zip`, `mocap_ground*.zip`, `scanned_object.tar`,
+   `dataset_information.json`, `object_index.json`)
+2. Extract each archive into `HOI-M3/` so the `calibration_ground/`, `mocap_ground/` and `scanned_object/`
+   folders land directly under it, and drop the two `.json` files alongside them
 
 ---
 
