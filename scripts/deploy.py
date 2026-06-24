@@ -116,9 +116,10 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27,
     return f"{preamble} && {cmd}"
 
 
-# Location of the G1 MuJoCo (MJCF) models, exported to the sim pane so the
-# unitree_simulation package resolves g1_27dof.xml / g1_29dof.xml at runtime.
-_G1_MJCF_DIR = "modules/third_party/holosoma_custom/src/holosoma_retargeting/holosoma_retargeting/models/g1"
+# Location of the G1 MuJoCo WBT physics scenes (robot + plane, collisions enabled),
+# exported to the sim pane so the unitree_simulation package resolves
+# scene_g1_{27,29}dof_wbt_plane.xml at runtime.
+_G1_MJCF_DIR = "modules/third_party/holosoma_custom/src/holosoma/holosoma/data/robots/g1/scenes"
 
 
 def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int = 27,
