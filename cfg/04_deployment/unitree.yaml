@@ -8,6 +8,7 @@ entry_points:
     args:
       robot:        robot:=
       unlock_base:  unlock_base:=
+      dof:          "dof:="
     defaults:
       unlock_base: "False"
 

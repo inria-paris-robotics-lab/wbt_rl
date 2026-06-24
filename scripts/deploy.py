@@ -26,6 +26,14 @@ _ROBOT_MAP = {
     "g1_29dof": "g1",
 }
 
+# Actuated DOF implied by each robot variant. Used as the default for --g1-dof so
+# `--robot g1_29dof` switches the whole stack (sim URDF + watchdog + bridge) to 29
+# without a second flag. An explicit --g1-dof still overrides this.
+_ROBOT_DOF = {
+    "g1_27dof": 27,
+    "g1_29dof": 29,
+}
+
 _DDS_MODE = {
     "SIM": "SIMULATION",
     "REAL": "REAL",
@@ -88,7 +96,7 @@ def _load_cfg(deployer: str) -> dict:
     return yaml.safe_load(cfg_path.read_text())
 
 
-def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int) -> str:
+def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27) -> str:
     cmd = ep["cmd"].replace("{repo_root}", str(repo_root()))
     args_map = ep.get("args", {})
     defaults = ep.get("defaults", {})
@@ -105,7 +113,7 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int) -> st
     return f"{preamble} && {cmd}"
 
 
-def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int) -> list[dict]:
+def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int = 27) -> list[dict]:
     env = cfg["env"]
     cws = cfg["cyclonedds_ws"]
     dds = _DDS_MODE[mode]
@@ -168,9 +176,10 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="SIM: simulator+watchdog+bridge. REAL: shutdown+watchdog+bridge.")
     parser.add_argument("--robot", default="g1_27dof",
                         help="Robot variant (default: g1_27dof)")
-    parser.add_argument("--g1-dof", type=int, choices=[27, 29], default=27, dest="g1_dof",
-                        help="Actuated G1 DOF threaded to watchdog (dof:=) and bridge (--dof). "
-                             "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). Default 27.")
+    parser.add_argument("--g1-dof", type=int, choices=[27, 29], default=None, dest="g1_dof",
+                        help="Actuated G1 DOF threaded to sim (dof:=), watchdog (dof:=) and bridge (--dof). "
+                             "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). "
+                             "Defaults to the value implied by --robot (g1_27dof -> 27, g1_29dof -> 29).")
     parser.add_argument("--deployer", default="unitree",
                         help="Deployer config — matches cfg/04_deployment/{deployer}.yaml (default: unitree)")
     return parser
@@ -188,11 +197,14 @@ def main():
         _check_robot_network()
 
     robot_ros2 = _robot_to_ros2(args.robot)
+    # Explicit --g1-dof wins; otherwise derive the DOF from the robot variant so the
+    # sim, watchdog and bridge all run in the same mode.
+    g1_dof = args.g1_dof if args.g1_dof is not None else _ROBOT_DOF[args.robot.lower()]
     cfg = _load_cfg(args.deployer)
-    panes = _pane_defs(args.mode, cfg, robot_ros2, args.g1_dof)
+    panes = _pane_defs(args.mode, cfg, robot_ros2, g1_dof)
     session_name = f"wbt-deploy-{args.mode.lower()}"
 
-    print(f"Launching {args.mode} deployment (tmux session: {session_name})")
+    print(f"Launching {args.mode} deployment (tmux session: {session_name}, robot: {args.robot}, G1 DOF: {g1_dof})")
     for p in panes:
         print(f"  [{p['name']}]")
     _launch_tmux(session_name, panes)
