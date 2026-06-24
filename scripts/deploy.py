@@ -96,7 +96,8 @@ def _load_cfg(deployer: str) -> dict:
     return yaml.safe_load(cfg_path.read_text())
 
 
-def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27) -> str:
+def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27,
+                    sim_engine: str = "pybullet") -> str:
     cmd = ep["cmd"].replace("{repo_root}", str(repo_root()))
     args_map = ep.get("args", {})
     defaults = ep.get("defaults", {})
@@ -106,6 +107,8 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27) 
             arg_parts.append(f"{ros2_prefix}{robot_ros2}")
         elif wbt_arg == "dof":
             arg_parts.append(f"{ros2_prefix}{g1_dof}")
+        elif wbt_arg == "simulator":
+            arg_parts.append(f"{ros2_prefix}{sim_engine}")
         elif wbt_arg in defaults:
             arg_parts.append(f"{ros2_prefix}{defaults[wbt_arg]}")
     if arg_parts:
@@ -113,7 +116,13 @@ def _build_pane_cmd(ep: dict, robot_ros2: str, preamble: str, g1_dof: int = 27) 
     return f"{preamble} && {cmd}"
 
 
-def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int = 27) -> list[dict]:
+# Location of the G1 MuJoCo (MJCF) models, exported to the sim pane so the
+# unitree_simulation package resolves g1_27dof.xml / g1_29dof.xml at runtime.
+_G1_MJCF_DIR = "modules/third_party/holosoma_custom/src/holosoma_retargeting/holosoma_retargeting/models/g1"
+
+
+def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int = 27,
+               sim_engine: str = "pybullet") -> list[dict]:
     env = cfg["env"]
     cws = cfg["cyclonedds_ws"]
     dds = _DDS_MODE[mode]
@@ -121,15 +130,20 @@ def _pane_defs(mode: str, cfg: dict, robot_ros2: str, g1_dof: int = 27) -> list[
     eps = cfg["entry_points"]
 
     if mode == "SIM":
+        sim_cmd = _build_pane_cmd(eps["sim"], robot_ros2, preamble, g1_dof, sim_engine)
+        if sim_engine == "mujoco":
+            # Threaded to MujocoWrapper via G1Configuration.mjcf_path (only the sim pane needs it).
+            mjcf_dir = repo_root() / _G1_MJCF_DIR
+            sim_cmd = f'export WBT_G1_MJCF_DIR="{mjcf_dir}" && {sim_cmd}'
         return [
-            {"name": "sim",      "cmd": _build_pane_cmd(eps["sim"],      robot_ros2, preamble, g1_dof)},
-            {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"], robot_ros2, preamble, g1_dof)},
-            {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],   robot_ros2, preamble, g1_dof)},
+            {"name": "sim",      "cmd": sim_cmd},
+            {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"], robot_ros2, preamble, g1_dof, sim_engine)},
+            {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],   robot_ros2, preamble, g1_dof, sim_engine)},
         ]
     return [
-        {"name": "shutdown", "cmd": _build_pane_cmd(eps["shutdown_sportsmode"], robot_ros2, preamble, g1_dof)},
-        {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"],            robot_ros2, preamble, g1_dof)},
-        {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],              robot_ros2, preamble, g1_dof)},
+        {"name": "shutdown", "cmd": _build_pane_cmd(eps["shutdown_sportsmode"], robot_ros2, preamble, g1_dof, sim_engine)},
+        {"name": "watchdog", "cmd": _build_pane_cmd(eps["watchdog"],            robot_ros2, preamble, g1_dof, sim_engine)},
+        {"name": "bridge",   "cmd": _build_pane_cmd(eps["bridge"],              robot_ros2, preamble, g1_dof, sim_engine)},
     ]
 
 
@@ -180,6 +194,9 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Actuated G1 DOF threaded to sim (dof:=), watchdog (dof:=) and bridge (--dof). "
                              "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). "
                              "Defaults to the value implied by --robot (g1_27dof -> 27, g1_29dof -> 29).")
+    parser.add_argument("--simulator", default="pybullet", choices=["pybullet", "mujoco"],
+                        help="Physics engine for SIM mode (default: pybullet). 'mujoco' drives the same "
+                             "deploy/infer stack against MuJoCo via the AbstractSimulatorWrapper. Ignored for REAL.")
     parser.add_argument("--deployer", default="unitree",
                         help="Deployer config — matches cfg/04_deployment/{deployer}.yaml (default: unitree)")
     return parser
@@ -201,10 +218,11 @@ def main():
     # sim, watchdog and bridge all run in the same mode.
     g1_dof = args.g1_dof if args.g1_dof is not None else _ROBOT_DOF[args.robot.lower()]
     cfg = _load_cfg(args.deployer)
-    panes = _pane_defs(args.mode, cfg, robot_ros2, g1_dof)
+    panes = _pane_defs(args.mode, cfg, robot_ros2, g1_dof, args.simulator)
     session_name = f"wbt-deploy-{args.mode.lower()}"
 
-    print(f"Launching {args.mode} deployment (tmux session: {session_name}, robot: {args.robot}, G1 DOF: {g1_dof})")
+    print(f"Launching {args.mode} deployment (tmux session: {session_name}, robot: {args.robot}, "
+          f"G1 DOF: {g1_dof}, simulator: {args.simulator})")
     for p in panes:
         print(f"  [{p['name']}]")
     _launch_tmux(session_name, panes)

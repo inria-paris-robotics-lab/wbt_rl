@@ -6,6 +6,7 @@ entry_points:
   sim:
     cmd: ros2 launch unitree_simulation launch_sim.launch.py
     args:
+      simulator:    "simulator:="
       robot:        robot:=
       unlock_base:  unlock_base:=
       dof:          "dof:="
