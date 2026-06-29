@@ -26,6 +26,14 @@ _ROBOT_MAP = {
     "g1_29dof": "g1",
 }
 
+# Actuated DOF implied by the robot variant. The bridge/watchdog must use this so
+# the LowCmd mode_machine (5 for 29-DOF, 6 for 27-DOF) matches what the G1 reports
+# in LowState — otherwise the firmware silently rejects every command.
+_ROBOT_DOF = {
+    "g1_27dof": 27,
+    "g1_29dof": 29,
+}
+
 _DDS_MODE = {
     "SIM": "SIMULATION",
     "REAL": "REAL",
@@ -168,9 +176,10 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="SIM: simulator+watchdog+bridge. REAL: shutdown+watchdog+bridge.")
     parser.add_argument("--robot", default="g1_27dof",
                         help="Robot variant (default: g1_27dof)")
-    parser.add_argument("--g1-dof", type=int, choices=[27, 29], default=27, dest="g1_dof",
+    parser.add_argument("--g1-dof", type=int, choices=[27, 29], default=None, dest="g1_dof",
                         help="Actuated G1 DOF threaded to watchdog (dof:=) and bridge (--dof). "
-                             "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). Default 27.")
+                             "27 = waist_roll/pitch locked (mode 6); 29 = actuated (mode 5). "
+                             "Defaults to the DOF implied by --robot (g1_27dof->27, g1_29dof->29).")
     parser.add_argument("--deployer", default="unitree",
                         help="Deployer config — matches cfg/04_deployment/{deployer}.yaml (default: unitree)")
     return parser
@@ -188,8 +197,20 @@ def main():
         _check_robot_network()
 
     robot_ros2 = _robot_to_ros2(args.robot)
+
+    # Derive the actuated DOF from the robot variant unless explicitly overridden.
+    # This keeps the LowCmd mode_machine in sync with the robot (see _ROBOT_DOF).
+    g1_dof = args.g1_dof if args.g1_dof is not None else _ROBOT_DOF[args.robot.lower()]
+    if args.g1_dof is not None and args.g1_dof != _ROBOT_DOF[args.robot.lower()]:
+        print(
+            f"WARNING: --g1-dof {args.g1_dof} overrides the {_ROBOT_DOF[args.robot.lower()]} DOF "
+            f"implied by --robot {args.robot}. The G1 will reject commands unless this matches "
+            f"its reported mode_machine.",
+            file=sys.stderr,
+        )
+
     cfg = _load_cfg(args.deployer)
-    panes = _pane_defs(args.mode, cfg, robot_ros2, args.g1_dof)
+    panes = _pane_defs(args.mode, cfg, robot_ros2, g1_dof)
     session_name = f"wbt-deploy-{args.mode.lower()}"
 
     print(f"Launching {args.mode} deployment (tmux session: {session_name})")
