@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Pipeline outputs (data / large files — not versioned)
+work/
+*.npz
+*.pt
+*.pkl
+*.ckpt
+*.pth
+*.mp4
+*.avi
+*.r3d
+*.log
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
