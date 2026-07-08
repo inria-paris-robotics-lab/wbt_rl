@@ -106,6 +106,30 @@ def load_foundationpose(poses_dir):
     return raw, valid
 
 
+def smooth_object_poses(poses, win=9):
+    """Temporal smoothing of per-frame object poses (kills FoundationPose jitter).
+
+    Translation: median despike (w=5) then moving average (win). Rotation: window
+    mean of rotations (scipy). poses (T,4,4) -> smoothed (T,4,4).
+    """
+    from scipy.spatial.transform import Rotation
+    T = len(poses)
+    h = win // 2
+
+    def _roll(x, w, fn):
+        wh = w // 2
+        return np.array([fn(x[max(0, i - wh):i + wh + 1], axis=0) for i in range(len(x))])
+
+    trans = _roll(_roll(poses[:, :3, 3], 5, np.median), win, np.mean)   # despike + smooth
+    R = Rotation.from_matrix(poses[:, :3, :3])
+    rot = np.stack([R[max(0, i - h):min(T, i + h + 1)].mean().as_matrix() for i in range(T)])
+
+    out = np.tile(np.eye(4), (T, 1, 1))
+    out[:, :3, :3] = rot
+    out[:, :3, 3] = trans
+    return out
+
+
 def rigid_transform(A, B):
     """R,t with B ~= R @ A + t. A,B: (N,3)."""
     ca, cb = A.mean(0), B.mean(0)
@@ -141,15 +165,19 @@ def smplx_joints(params, model_type, gender, model_dir, num_betas):
 
 
 def camera_to_world_transforms(g, model_type, n_body, gender, model_dir, num_betas):
-    """Per-frame T_world_cam (4x4) via rigid alignment joints_incam -> joints_global."""
+    """T_world_cam (4x4) via rigid alignment joints_incam -> joints_global.
+
+    The camera is static, so cam->world is a single rigid transform. We solve it once
+    from ALL frames' joints stacked (robust) and tile it — a per-frame fit would wobble
+    with body-pose noise and make the object jitter/drift against the body.
+    """
     j_cam = smplx_joints(g["incam"], model_type, gender, model_dir, num_betas)
     j_wld = smplx_joints(g["global"], model_type, gender, model_dir, num_betas)
     T = min(len(j_cam), len(j_wld))
+    R, t = rigid_transform(j_cam[:T].reshape(-1, 3), j_wld[:T].reshape(-1, 3))
     Ts = np.tile(np.eye(4), (T, 1, 1))
-    for i in range(T):
-        R, t = rigid_transform(j_cam[i], j_wld[i])
-        Ts[i, :3, :3] = R
-        Ts[i, :3, 3] = t
+    Ts[:, :3, :3] = R
+    Ts[:, :3, 3] = t
     return Ts
 
 
@@ -175,6 +203,8 @@ def main():
     ap.add_argument("--object-mesh", default="", help="CAD path (metadata)")
     ap.add_argument("--smpl-model-dir", default="",
                     help="SMPL/SMPL-X model dir (required if --coord world)")
+    ap.add_argument("--smooth-object", type=int, default=9,
+                    help="temporal smoothing window for the object pose (0/1 = off)")
     args = ap.parse_args()
 
     g = load_gvhmr(args.gvhmr_pt)
@@ -183,6 +213,9 @@ def main():
     print(f"[fuse] detected model: {model_type} ({n_body} body joints, {num_betas} betas)")
 
     obj_cam, obj_valid = load_foundationpose(args.fp_poses)
+    if args.smooth_object > 1:
+        obj_cam = smooth_object_poses(obj_cam, args.smooth_object)
+        print(f"[fuse] object pose smoothed (window {args.smooth_object})")
 
     body = g["incam"] if args.coord == "camera" else g["global"]
 
