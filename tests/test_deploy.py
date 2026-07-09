@@ -256,3 +256,49 @@ def test_parser_invalid_mode_rejected():
     parser = deploy._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["--mode", "INVALID"])
+
+
+# ---------------------------------------------------------------------------
+# --simulator threading (pybullet / mujoco)
+# ---------------------------------------------------------------------------
+
+def test_parser_simulator_defaults_pybullet():
+    args = deploy._build_parser().parse_args(["--mode", "SIM"])
+    assert args.simulator == "pybullet"
+
+
+def test_parser_simulator_mujoco_accepted():
+    args = deploy._build_parser().parse_args(["--mode", "SIM", "--simulator", "mujoco"])
+    assert args.simulator == "mujoco"
+
+
+def test_parser_simulator_invalid_rejected():
+    with pytest.raises(SystemExit):
+        deploy._build_parser().parse_args(["--mode", "SIM", "--simulator", "isaac"])
+
+
+def test_build_pane_cmd_threads_simulator():
+    ep = {
+        "cmd": "ros2 launch unitree_simulation launch_sim.launch.py",
+        "args": {"simulator": "simulator:=", "robot": "robot:="},
+    }
+    result = deploy._build_pane_cmd(ep, "g1", _PREAMBLE, sim_engine="mujoco")
+    assert "simulator:=mujoco" in result
+
+
+def test_pane_defs_sim_pybullet_has_no_mjcf_export():
+    panes = deploy._pane_defs("SIM", _make_cfg(), "g1", 29, "pybullet")
+    sim_cmd = panes[0]["cmd"]
+    assert "simulator:=pybullet" in sim_cmd
+    assert "WBT_G1_MJCF_DIR" not in sim_cmd
+
+
+def test_pane_defs_sim_mujoco_exports_mjcf_dir():
+    panes = deploy._pane_defs("SIM", _make_cfg(), "g1", 29, "mujoco")
+    sim_cmd = panes[0]["cmd"]
+    assert sim_cmd.startswith('export WBT_G1_MJCF_DIR="')
+    assert "simulator:=mujoco" in sim_cmd
+    assert deploy._G1_MJCF_DIR in sim_cmd
+    # only the sim pane carries the export, not watchdog/bridge
+    assert "WBT_G1_MJCF_DIR" not in panes[1]["cmd"]
+    assert "WBT_G1_MJCF_DIR" not in panes[2]["cmd"]
