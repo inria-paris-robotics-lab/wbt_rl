@@ -165,19 +165,25 @@ def smplx_joints(params, model_type, gender, model_dir, num_betas):
 
 
 def camera_to_world_transforms(g, model_type, n_body, gender, model_dir, num_betas):
-    """T_world_cam (4x4) via rigid alignment joints_incam -> joints_global.
+    """Per-frame rigid T_world_cam[t] aligning joints_incam[t] -> joints_global[t].
 
-    The camera is static, so cam->world is a single rigid transform. We solve it once
-    from ALL frames' joints stacked (robust) and tile it — a per-frame fit would wobble
-    with body-pose noise and make the object jitter/drift against the body.
+    A SINGLE averaged transform (the earlier approach) is wrong: GVHMR's global is not a
+    static rigid transform of incam (its root trajectory is estimated separately), so one
+    fit leaves a multi-cm residual (measured ~6 cm median, up to 19 cm) and the object
+    drifts off the body in world -> a grasped object visibly leaves the hands even though
+    the contact is correct in the camera frame. A per-frame fit maps each frame's camera
+    body exactly onto that frame's world body, so anything rigid to the camera body (the
+    held object) stays glued to it in world. Residual wobble is shared with the body, so
+    contact is preserved; the transform is temporally smooth because GVHMR's global is.
     """
     j_cam = smplx_joints(g["incam"], model_type, gender, model_dir, num_betas)
     j_wld = smplx_joints(g["global"], model_type, gender, model_dir, num_betas)
     T = min(len(j_cam), len(j_wld))
-    R, t = rigid_transform(j_cam[:T].reshape(-1, 3), j_wld[:T].reshape(-1, 3))
     Ts = np.tile(np.eye(4), (T, 1, 1))
-    Ts[:, :3, :3] = R
-    Ts[:, :3, 3] = t
+    for i in range(T):
+        R, t = rigid_transform(j_cam[i], j_wld[i])
+        Ts[i, :3, :3] = R
+        Ts[i, :3, 3] = t
     return Ts
 
 
@@ -205,6 +211,10 @@ def main():
                     help="SMPL/SMPL-X model dir (required if --coord world)")
     ap.add_argument("--smooth-object", type=int, default=9,
                     help="temporal smoothing window for the object pose (0/1 = off)")
+    ap.add_argument("--object-hold-until", type=int, default=-1,
+                    help="freeze the object WORLD pose for frames [0:K] to frame K -- the box is "
+                         "static on its support before pickup, but the per-frame cam->world transform "
+                         "would wobble it. -1 = auto (hold until the box starts moving), 0 = off, K = manual")
     args = ap.parse_args()
 
     g = load_gvhmr(args.gvhmr_pt)
@@ -235,6 +245,19 @@ def main():
         Tw = camera_to_world_transforms(g, model_type, n_body, args.gender,
                                         args.smpl_model_dir, num_betas)[:T]
         obj_pose = np.einsum("tij,tjk->tik", Tw, obj_pose)  # T_world_cam @ T_obj_cam
+
+    # freeze the free (pre-pickup) object to a single world pose: it is static in the
+    # camera before being grasped, but the per-frame cam->world transform would wobble it.
+    if args.object_hold_until != 0:
+        if args.object_hold_until > 0:
+            k = min(args.object_hold_until, T - 1)
+        else:  # auto: first frame the box actually starts moving in the CAMERA
+            spd = np.linalg.norm(np.diff(obj_cam[:T, :3, 3], axis=0), axis=1)
+            mv = np.where(spd > 0.005)[0]          # >5 mm/frame = real motion (pickup)
+            k = int(mv[0]) if len(mv) else 0
+        if k > 0:
+            obj_pose[:k] = obj_pose[k]
+            print(f"[fuse] object held static for frames [0:{k}] (pre-pickup) = frame {k}")
 
     poses = build_poses(body, model_type)[:T]
     betas = np.asarray(body["betas"]).reshape(T_body, -1)[:T]

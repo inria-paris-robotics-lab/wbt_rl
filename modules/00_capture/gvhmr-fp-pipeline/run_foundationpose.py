@@ -24,7 +24,9 @@ def main():
     ap.add_argument("--mesh_file", required=True)
     ap.add_argument("--test_scene_dir", required=True)
     ap.add_argument("--debug_dir", required=True)
-    ap.add_argument("--shorter-side", type=int, default=480, help="downscale so short side = this")
+    ap.add_argument("--shorter-side", type=int, default=640,
+                    help="downscale so short side = this (640 keeps more depth detail; 12GB VRAM OK. "
+                         "Lower to 480 if register() OOMs, raise toward 720 for more precision)")
     ap.add_argument("--est-refine-iter", type=int, default=5)
     ap.add_argument("--track-refine-iter", type=int, default=2)
     ap.add_argument("--save-vis", action="store_true", help="write pose-overlay frames to track_vis/")

@@ -20,6 +20,8 @@ def main():
     ap.add_argument("--clip", required=True, help="clip.npz from fuse.py")
     ap.add_argument("--model-dir", required=True, help="parent of the smplx/ model folder")
     ap.add_argument("--object-mesh", default="", help="override object CAD (else read from npz)")
+    ap.add_argument("--extra-mesh", default="", help="2e CAD affiché CONCENTRIQUE (ex box36 réelle), en fil "
+                    "de fer togglable dans viser -> voir de combien les mains poussent dans la vraie caisse")
     ap.add_argument("--gender", default="neutral")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--fps", type=float, default=30.0)
@@ -80,21 +82,43 @@ def main():
     # object-floor contact: the box rests on the ground -> put its resting level at z=0.
     box_bottom = obj_v[..., 2].min(axis=1)
     resting = box_bottom <= np.percentile(box_bottom, 30)
-    obj_v[..., 2] -= float(np.median(box_bottom[resting]))
+    rest_shift = float(np.median(box_bottom[resting]))
+    obj_v[..., 2] -= rest_shift
+
+    # 2e caisse (ex box36 réelle) : MÊMES pose/rotation/décalages -> CONCENTRIQUE avec l'objet grippé,
+    # donc les mains posées sur la 32 apparaissent à l'intérieur de la 36 (= la poussée du grip serré).
+    obj36_v = obj36_f = None
+    if args.extra_mesh:
+        m36 = trimesh.load(args.extra_mesh, force="mesh", process=False)
+        v36 = np.asarray(m36.vertices, np.float32)
+        obj36_f = np.asarray(m36.faces, np.int32)
+        obj36_v = np.einsum("tij,vj->tvi", P[:, :3, :3], v36) + P[:, None, :3, 3]
+        obj36_v = np.einsum("ij,tvj->tvi", R, obj36_v).astype(np.float32)
+        obj36_v[..., 2] -= floor_s[:, None]
+        obj36_v[..., 2] -= rest_shift
 
     server = viser.ViserServer(port=args.port)
     cx, cy = float(body_v[..., 0].mean()), float(body_v[..., 1].mean())
     server.scene.add_grid("/grid", width=6.0, height=6.0, position=(cx, cy, 0.0))
+
+    gui_show36 = (server.gui.add_checkbox("caisse 36 (réelle, fil de fer)", True)
+                  if obj36_v is not None else None)
 
     def draw(i):
         server.scene.add_mesh_simple("/body", body_v[i], body_f,
                                      color=(210, 210, 210), flat_shading=False, side="double")
         server.scene.add_mesh_simple("/object", obj_v[i], obj_f,
                                      color=(235, 130, 20), flat_shading=True, side="double")
+        if obj36_v is not None:
+            server.scene.add_mesh_simple("/object36", obj36_v[i], obj36_f,
+                                         color=(60, 140, 235), flat_shading=True, side="double",
+                                         wireframe=True, visible=gui_show36.value)
 
     gui_frame = server.gui.add_slider("frame", min=0, max=T - 1, step=1, initial_value=0)
     gui_play = server.gui.add_checkbox("play", True)
     gui_frame.on_update(lambda _: draw(gui_frame.value))
+    if gui_show36 is not None:
+        gui_show36.on_update(lambda _: draw(gui_frame.value))
     draw(0)
     print(f"[clip] open http://localhost:{args.port}  (Ctrl-C to stop)")
 
