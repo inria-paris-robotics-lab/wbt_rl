@@ -133,13 +133,21 @@ def retarget_sequence(
     else:
         print(f"  [2/4] to_unified_input    → skipped (OMOMO_new precomputed)")
 
+    # Resolve the interaction object from the sequence name (OMOMO: sub{N}_{object}_{NNN})
+    # and make sure its mesh/URDF exist, else holosoma falls back to its largebox default.
+    object_name = None
+    if task_type == "object_interaction" and dataset_up in ("OMOMO", "OMOMO_NEW"):
+        object_name = _omomo_object_name(seq_name)
+        robot_urdf = repo_root() / cfg["robot_config"][robot]["urdf"]
+        _ensure_omomo_object_model(retargeter_lo, object_name, robot_urdf)
+
     # Step c: run retargeter subprocess
     print(f"  [3/4] retargeter subprocess ({cfg['env']})")
     _run_retargeter(
         retargeter_lo, cfg, input_format,
         input_raw_path, output_raw_path, run_dir,
         seq_name, robot, task_type, visualize,
-        dataset=dataset_up,
+        dataset=dataset_up, object_name=object_name,
     )
 
     # Retargeters that receive --save_dir (not --output) may name the output file
@@ -200,6 +208,7 @@ def _run_retargeter(
     task_type: str = "robot_only",
     visualize: bool = False,
     dataset: str = "",
+    object_name: str | None = None,
 ) -> None:
     env = cfg["env"]
     ep_name = cfg["entry_point_by_input_format"][input_format]
@@ -255,6 +264,8 @@ def _run_retargeter(
         cmd += f" {arg_map['task_type']} {task_type}"
     if "task_name" in arg_map:
         cmd += f" {arg_map['task_name']} {seq_name}"
+    if "object_name" in arg_map and object_name:
+        cmd += f" {arg_map['object_name']} {object_name}"
     if "data_format" in arg_map and "data_format" in format_args:
         cmd += f" {arg_map['data_format']} {format_args['data_format']}"
 
@@ -274,7 +285,13 @@ def _run_retargeter(
 # ---------------------------------------------------------------------------
 
 def _lookup_omomo_obj_scale(object_name: str) -> float | None:
-    """Read the mean obj_scale for a given object from the OMOMO training pickle."""
+    """Read the mean obj_scale for a given object from the OMOMO training pickle.
+
+    obj_scale is stored per frame and OMOMO pads some frames with 0.0; those are
+    dropped so the mean reflects the real metric size of the object. Sequences are
+    matched on the exact object token (sub{N}_{object}_{NNN}) to avoid cross-object
+    substring collisions.
+    """
     try:
         import joblib
         import numpy as np
@@ -282,14 +299,132 @@ def _lookup_omomo_obj_scale(object_name: str) -> float | None:
         if not p_file.exists():
             return None
         data = joblib.load(p_file)
-        scales = [
-            float(data[i]["obj_scale"].mean())
-            for i in data
-            if object_name in data[i].get("seq_name", "")
-        ]
+        scales = []
+        for i in data:
+            seq_name = data[i].get("seq_name", "")
+            if seq_name.split("_")[1:2] != [object_name]:
+                continue
+            s = np.asarray(data[i]["obj_scale"]).ravel()
+            s = s[s > 1e-6]
+            if s.size:
+                scales.append(float(s.mean()))
         return float(np.mean(scales)) if scales else None
     except Exception:
         return None
+
+
+# Minimal URDF matching the bundled largebox model (mesh sits next to the URDF, so a
+# relative filename resolves for yourdfpy during --visualize).
+_OBJECT_URDF_TEMPLATE = """\
+<?xml version="1.0" ?>
+<robot name="{name}">
+  <link name="{name}_link">
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.002"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="{name}.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+      <material name="mat">
+        <color rgba="0.7 0.8 0.9 0.7"/>
+      </material>
+    </visual>
+    <collision name="{name}">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="{name}.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
+"""
+
+
+def _omomo_object_name(seq_name: str) -> str:
+    """Object token of an OMOMO sequence name (sub{N}_{object}_{NNN})."""
+    parts = seq_name.split("_")
+    if len(parts) < 3:
+        raise ValueError(f"Cannot derive OMOMO object name from sequence {seq_name!r}")
+    return parts[1]
+
+
+def _write_recentred_scaled_obj(src: Path, dst: Path, scale: float) -> None:
+    """Recentre an .obj at its vertex mean and scale it, editing only its 'v' lines.
+
+    Kept pure-text so the retargeting orchestrator needs no mesh library. Vertex normals
+    ('vn') keep their direction under a uniform positive scale, so they are left untouched.
+    """
+    lines = src.read_text().splitlines()
+    verts = [[float(x) for x in ln.split()[1:4]] for ln in lines if ln.split()[:1] == ["v"]]
+    if not verts:
+        raise ValueError(f"No vertices found in {src}")
+    n = len(verts)
+    cx, cy, cz = (sum(v[k] for v in verts) / n for k in range(3))
+
+    out = []
+    for ln in lines:
+        if ln.split()[:1] == ["v"]:
+            p = ln.split()
+            x = (float(p[1]) - cx) * scale
+            y = (float(p[2]) - cy) * scale
+            z = (float(p[3]) - cz) * scale
+            out.append(f"v {x:.6f} {y:.6f} {z:.6f}")
+        else:
+            out.append(ln)
+    dst.write_text("\n".join(out) + "\n")
+
+
+def _ensure_omomo_object_model(retargeter: str, object_name: str, robot_urdf: Path) -> None:
+    """Ensure every per-object holosoma asset exists for an OMOMO interaction object.
+
+    Holosoma resolves the interaction object from three bundled-per-object paths; only
+    largebox ships, so any other sequence would silently fall back to the largebox assets:
+
+      - models/{object}/{object}.obj  — surface sampled into the interaction mesh
+      - models/{object}/{object}.urdf — object model loaded by viser under --visualize
+      - models/g1/{robot}_w_{object}.xml — MuJoCo scene (robot + free-joint object body)
+
+    The .obj reproduces the exact convention of the bundled largebox model: the raw OMOMO
+    capture (captured_objects/{object}_cleaned_simplified.obj) recentred at its vertex mean
+    and scaled to metric size by obj_scale, so the object poses baked in the .pt line up with
+    the mesh surface. The scene XML mirrors the bundled largebox scene, which differs from the
+    plain robot XML only by the object mesh asset + body, so a name swap is enough. All are
+    generated on the fly (not committed); largebox is left untouched.
+    """
+    models_dir = repo_root() / "modules" / "01_retargeting" / retargeter / "models" / object_name
+    obj_out = models_dir / f"{object_name}.obj"
+    urdf_out = models_dir / f"{object_name}.urdf"
+
+    if not (obj_out.exists() and urdf_out.exists()):
+        raw_mesh = dataset_path("OMOMO") / "captured_objects" / f"{object_name}_cleaned_simplified.obj"
+        if not raw_mesh.exists():
+            raise FileNotFoundError(
+                f"No captured mesh for object {object_name!r}: {raw_mesh} not found"
+            )
+        scale = _lookup_omomo_obj_scale(object_name)
+        if not scale:
+            raise ValueError(f"Could not resolve obj_scale for object {object_name!r}")
+
+        models_dir.mkdir(parents=True, exist_ok=True)
+        _write_recentred_scaled_obj(raw_mesh, obj_out, scale)
+        urdf_out.write_text(_OBJECT_URDF_TEMPLATE.format(name=object_name))
+        print(f"     generated object model → models/{object_name}/ (obj_scale {scale:.4f})")
+
+    # Per-robot MuJoCo scene: holosoma loads {robot}_w_{object}.xml for object_interaction.
+    robot_urdf = Path(robot_urdf)
+    scene_xml = robot_urdf.with_name(f"{robot_urdf.stem}_w_{object_name}.xml")
+    if not scene_xml.exists():
+        largebox_scene = robot_urdf.with_name(f"{robot_urdf.stem}_w_largebox.xml")
+        if not largebox_scene.exists():
+            raise FileNotFoundError(
+                f"No largebox scene to derive {scene_xml.name} from: {largebox_scene}"
+            )
+        scene_xml.write_text(largebox_scene.read_text().replace("largebox", object_name))
+        print(f"     generated scene xml → models/g1/{scene_xml.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +519,13 @@ def main():
     object_name = "ground"
     object_scale = None
     if task_type == "object_interaction":
-        object_name = "largebox"
+        if dataset in ("OMOMO", "OMOMO_NEW") and seqs:
+            objs = sorted({_omomo_object_name(name) for name, _ in seqs})
+            if len(objs) > 1:
+                print(f"  WARNING: run mixes objects {objs}; config.yaml records {objs[0]!r}")
+            object_name = objs[0]
+        else:
+            object_name = "largebox"
         object_scale = _lookup_omomo_obj_scale(object_name)
 
     with open(config_out, "w") as f:
