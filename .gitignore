@@ -46,3 +46,6 @@ Thumbs.db
 .idea/
 .pytest_cache/
 docs/
+# Temporary probe/diag/eval outputs (not source)
+/Log/
+modules/Log/

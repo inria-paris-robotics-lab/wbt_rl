@@ -48,6 +48,22 @@ def _stretch_grid(T, factor):
     return i0, i1, (t - i0), Tp
 
 
+def _warp_grid(T, base_factor, segments):
+    """Grille de warp PAR SEGMENTS : facteur local f sur [s,e) (frames SOURCE), base_factor
+    ailleurs. Ex : marche resynthétisée (gait_opt) gardée ~vitesse réelle (1.25) pendant que
+    prise/dépôt restent ralentis (1.6). Temps de sortie = cumul des facteurs par intervalle,
+    inversé par interp monotone -> même convention de retour que _stretch_grid."""
+    loc = np.full(T - 1, float(base_factor))
+    for (s, e, f) in segments:
+        loc[max(0, s):min(T - 1, e)] = f
+    ct = np.concatenate([[0.0], np.cumsum(loc)])
+    Tp = max(2, int(round(ct[-1])) + 1)
+    src = np.interp(np.linspace(0.0, ct[-1], Tp), ct, np.arange(T, dtype=float))
+    i0 = np.floor(src).astype(int)
+    i1 = np.minimum(i0 + 1, T - 1)
+    return i0, i1, (src - i0), Tp
+
+
 def _stretch_lerp(arr, i0, i1, w):
     """arr (T, C) -> (T', C) par lerp linéaire (positions)."""
     return arr[i0] * (1.0 - w[:, None]) + arr[i1] * w[:, None]
@@ -102,10 +118,21 @@ def main():
     ap.add_argument("--object-mesh", default="", help="override object mesh path (else from clip.npz)")
     ap.add_argument("--smooth", type=int, default=0, help="lissage Savitzky-Golay (fenêtre impaire, 0=off) du "
                     "corps entier (root_orient/pose_body/trans) -> mouvement retargeté plus lisse")
+    ap.add_argument("--ground", default="feet-median", choices=["feet-median", "per-frame"],
+                    help="feet-median (défaut) = un seul décalage Z constant (médiane du pied le plus bas sur "
+                    "tout le clip) ; per-frame = décalage Z par frame basé sur le point le plus bas du MESH "
+                    "entier (mains/genoux/dos compris), pour les mouvements au sol (allongé -> assis -> genoux "
+                    "-> debout) où un décalage constant fait flotter ou pénétrer le sol selon la phase")
+    ap.add_argument("--ground-smooth", type=int, default=9, help="fenêtre Savitzky-Golay (impaire) du lissage "
+                    "temporel du décalage sol en mode per-frame (0=off) ; le décalage lissé est toujours plafonné "
+                    "au minimum brut de la frame pour garantir zéro pénétration")
     ap.add_argument("--slow-factor", type=float, default=1.0, help="étire le TEMPS du clip d'un facteur "
                     "(ex 1.7 = 1.7x plus lent) : interp slerp/lerp du corps ET des objets sur une grille "
                     "temporelle dilatée, mocap_frame_rate INCHANGÉ (30) -> corrige une capture dont le fps "
                     "réel était plus bas que le 30 déclaré (mouvement rejoué trop vite)")
+    ap.add_argument("--warp", default="", help="facteurs par SEGMENTS 's:e:f[,s:e:f...]' (frames source) ; "
+                    "--slow-factor s'applique ailleurs. Ex --slow-factor 1.6 --warp 95:132:1.25 = "
+                    "prise/dépôt 1.6x plus lents, marche 1.25x seulement")
     # support statique (2e objet) dérivé de la caisse posée en fin de clip
     ap.add_argument("--support", action="store_true", help="ajoute un support STATIQUE sous la caisse posée")
     ap.add_argument("--support-shape", default="box", choices=["box", "table"],
@@ -151,9 +178,19 @@ def main():
     up = np.zeros(3); up[ax] = np.sign(raw_up[ax])
     Rsnap = rot_to_z(up)
 
-    # floor shift : médiane du pied le plus bas (joints 10/11) APRÈS snap
     pos_snap = np.einsum("ij,tnj->tni", Rsnap, joints)
-    floor_shift = float(np.percentile(pos_snap[:, [10, 11], 2].min(axis=1), 50))
+    if args.ground == "per-frame":
+        # décalage sol PAR FRAME : point le plus bas du mesh entier (mains/genoux/dos au sol
+        # comptent, pas seulement les pieds) -> suit le vrai contact au sol frame par frame.
+        # Pas de lissage ICI (un savgol sur ce signal peut osciller/déborder près des transitions
+        # rapides, ex allongé -> genoux) : on applique la pose brute, lisse le corps ensuite comme
+        # d'habitude, puis on RE-PLAQUE exactement (voir plus bas, après le lissage --smooth).
+        verts_snap = np.einsum("ij,tnj->tni", Rsnap, out.vertices.numpy())
+        floor_shift = verts_snap[:, :, 2].min(axis=1)                   # (T,)
+        print(f"[amass] sol per-frame : décalage brut [{floor_shift.min():.3f},{floor_shift.max():.3f}]")
+    else:
+        # floor shift : médiane du pied le plus bas (joints 10/11) APRÈS snap
+        floor_shift = float(np.percentile(pos_snap[:, [10, 11], 2].min(axis=1), 50))
 
     # root_orient Z-up = Rsnap ∘ global_orient ; trans = pos_racine_Zup - j0
     root_R = Rotation.from_rotvec(go).as_matrix()                       # (T,3,3)
@@ -173,6 +210,21 @@ def main():
             bp = savgol_filter(bp, w, 2, axis=0)
             trans = savgol_filter(trans, w, 2, axis=0)
             print(f"[amass] corps lissé (Savitzky-Golay fenêtre {w})")
+
+    if args.ground == "per-frame":
+        # RE-PLAQUAGE exact au sol APRÈS le lissage du corps (le lissage de la pose peut décoller
+        # ou enfoncer légèrement le mesh du sol par rapport au calcul fait sur la pose brute,
+        # surtout près des transitions rapides) : refait un forward avec la pose lissée et corrige
+        # trans_z du résidu exact, sans lissage additionnel (évite tout débordement de savgol).
+        with torch.no_grad():
+            out2 = model(betas=torch.as_tensor(betas, dtype=torch.float32),
+                        global_orient=torch.as_tensor(root_orient, dtype=torch.float32),
+                        body_pose=torch.as_tensor(bp, dtype=torch.float32),
+                        transl=torch.as_tensor(trans, dtype=torch.float32))
+        resid = out2.vertices.numpy()[:, :, 2].min(axis=1)
+        trans = trans.copy()
+        trans[:, 2] -= resid
+        print(f"[amass] sol per-frame : résidu post-lissage [{resid.min():.4f},{resid.max():.4f}] -> re-plaqué")
 
     betas16 = np.zeros(16, np.float32)
     betas16[:min(nb, 16)] = betas[0, :min(nb, 16)]
@@ -199,7 +251,8 @@ def main():
         box_mesh = args.object_mesh or str(c["object_mesh"])
         o_pos = np.einsum("ij,tj->ti", Rsnap, OP[:Tm, :3, 3])
         o_rot = np.einsum("ij,tjk->tik", Rsnap, OP[:Tm, :3, :3])
-        o_pos[:, 2] -= floor_shift
+        fs_obj = floor_shift[:Tm] if isinstance(floor_shift, np.ndarray) else floor_shift
+        o_pos[:, 2] -= fs_obj
         o_quat = Rotation.from_matrix(o_rot).as_quat()[:, [3, 0, 1, 2]]
         box7 = np.concatenate([o_pos, o_quat], axis=1).astype(np.float32)   # (Tm,7) caisse Z-up
 
@@ -255,9 +308,15 @@ def main():
         save["object_names"] = np.array(name_l)
         print(f"[amass] + {len(poses_l)} objet(s) embarqué(s): {name_l}")
 
-    if args.slow_factor != 1.0:
+    if args.slow_factor != 1.0 or args.warp:
         Torig = save["trans"].shape[0]
-        i0, i1, w, Tp = _stretch_grid(Torig, args.slow_factor)
+        if args.warp:
+            segs = [tuple(float(x) if i == 2 else int(x) for i, x in enumerate(sp.split(":")))
+                    for sp in args.warp.split(",")]
+            i0, i1, w, Tp = _warp_grid(Torig, args.slow_factor, segs)
+            print(f"[amass] warp segments {segs} (base x{args.slow_factor:.2f})")
+        else:
+            i0, i1, w, Tp = _stretch_grid(Torig, args.slow_factor)
         save["root_orient"] = _stretch_slerp_rotvec_blocks(save["root_orient"], i0, i1, w).astype(np.float32)
         save["pose_body"] = _stretch_slerp_rotvec_blocks(save["pose_body"], i0, i1, w).astype(np.float32)
         save["pose_hand"] = _stretch_slerp_rotvec_blocks(save["pose_hand"], i0, i1, w).astype(np.float32)

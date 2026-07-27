@@ -38,6 +38,8 @@ $PY_BASE "$PIPE/capture_femto.py" --out "$C"            # objet : ... --depth-mi
 vlc "$C/video.mp4"                          # vidéo couleur brute
 vlc "$C/gvhmr/video/1_incam.mp4"            # overlay mesh SMPL (après GVHMR)
 
+#------- RBG si c'est un mp4 mkdir -p "$C/rgb" && ffmpeg -i "$C/video.mp4" -start_number 0 "$C/rgb/%06d.png"
+#------ RGB D si on a seulement le rgb : $GV "$PIPE/estimate_depth.py" --rgb-dir "$C/rgb" --out-dir "$C/depth"
 # ------ 3. GVHMR : corps -> SMPL  (--f_mm 22 = vraie focale Femto) ----
 #   si tu re-filmes ce CLIP : d'abord  rm -rf "$C/gvhmr"  (sinon cache périmé)
 cd "$HOME/GVHMR" && $GV tools/demo/demo.py \
@@ -54,6 +56,9 @@ $PY_HOLO "$PIPE/view_smpl_viser.py" \
 # =====================================================================
 # ------ 5a. MediaPipe : boîtes des mains (env mp) ---------------------
 $PY_MP "$PIPE/extract_hands.py" --clip-dir "$C"
+#------- Sans depht # cam_K.txt à partir de l'intrinsèque estimée par GVHMR $PY_HOLO "$PIPE/write_cam_k.py" --pt "$C/gvhmr/video/hmr4d_results.pt" --clip-dir "$C"
+
+#-------- 5a. mains sans depth (bbox + wrist2d seulement) $PY_MP "$PIPE/extract_hands.py" --clip-dir "$C" --no-depth
 
 # ------ 5b. HaMeR : orientation des mains (env hamer) -----------------
 $PY_HAMER "$PIPE/extract_hands_hamer.py" \
@@ -190,3 +195,30 @@ cd "$WBT_ROOT" && python scripts/train.py \
     --dataset SFU --robot G1_29dof \
     --retargeter holosoma_custom --trainer holosoma_custom \
     --simulator isaacsim --retarget-run "run_${CLIP}" --no-video
+
+
+
+
+
+
+## Sans Objets et sans poignets Apres avoir SMPL
+7. Export amass — corps seul (SANS objet, SANS poignets corrigés)
+  $PY_HOLO "$PIPE/clip_to_amass.py" \
+      --pt "$C/gvhmr/video/hmr4d_results.pt" \
+      --model-dir "$SMPLX" \
+      --out "$C/${CLIP}_amass.npz"
+
+  8a. (optionnel) VISER — check visuel du retargeting G1
+  cd "$V2"
+  fuser -k 8080/tcp 2>/dev/null
+  $PY_HOLO -m src.viz.app --dataset amass \
+      --motion-path "$C/${CLIP}_amass.npz" \
+      --model-dir "$SMPLX/smplx" \
+      --frame-step 1 --max-frames 400 --solve \
+      --tr-base-pos 0.01 --tr-joints 0.02 --solve-iters-first 60 --solve-iters 8
+
+  8b. Sauver le qpos G1
+  $PY_HOLO "$PIPE/retarget_to_qpos.py" \
+      --dataset amass --motion-path "$C/${CLIP}_amass.npz" \
+      --model-dir "$SMPLX/smplx" \
+      --out "$C/${CLIP}_qpos.npz"
