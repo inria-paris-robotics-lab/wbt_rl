@@ -73,10 +73,16 @@ def main():
     print(f"[contact] prepared: {grounded.n_frames} frames, fps={grounded.fps}")
 
     obj_channel_idxs = [i for i, ch in enumerate(ctx.channels) if ch.object_idx is not None]
+    obj_names = [ctx.channels[i].name for i in obj_channel_idxs]
     print(f"[contact] channels: {[(i, ch.name, ch.object_idx) for i, ch in enumerate(ctx.channels)]}")
     if not obj_channel_idxs:
         raise SystemExit("no object channel found -- this clip has no object in the scene")
-    box_channel = obj_channel_idxs[0]  # single-grasped-object clips (femto14): the box, not the support
+    # N-object: compute the SAME contact fields (dist d + witness + active) for EVERY object channel
+    # (box, support/table, ...), not just the box. Each object carries its own SDF in the field, so
+    # the hand<->object contact is uniform per object -- when a hand gets close to the table it fires
+    # exactly like the box. Object 0 is also written to the legacy singular keys for backward compat.
+    M = len(obj_channel_idxs)
+    print(f"[contact] {M} object(s): {obj_names} -> per-object contact")
 
     hand_link_order = args.hand_links.split(",")
     link_names = ctx.correspondence.link_names
@@ -90,42 +96,58 @@ def main():
 
     T = grounded.n_frames
     n_hands = len(hand_link_order)
-    dist_per_hand = np.full((T, n_hands), np.nan)
-    active_per_hand = np.zeros((T, n_hands), dtype=bool)
-    witness_local_per_hand = np.zeros((T, n_hands, 3))
+    # (T, M, n_hands)
+    dist_per_hand = np.full((T, M, n_hands), np.nan)
+    active_per_hand = np.zeros((T, M, n_hands), dtype=bool)
+    witness_local_per_hand = np.zeros((T, M, n_hands, 3))
 
     for f in range(T):
         targets = process_frame(grounded, ctx, robot, f)
         field = targets.robot_interaction.field  # MultiChannelField (C, P)
-        for h, mask in enumerate(hand_point_masks):
-            hand_dist = field.distance[box_channel, mask]
-            nearest_local_idx = int(np.argmin(hand_dist))
-            dist_per_hand[f, h] = float(hand_dist[nearest_local_idx])
-            active_per_hand[f, h] = bool(field.active[box_channel, mask].any())
-            # witness of the point WITHIN this hand closest to the box (not an average -- the actual
-            # nearest contact location). eval_fields transforms probes into the channel's (box-local)
-            # frame BEFORE sampling the SDF (see targets/interaction/fields.py: `probe = (pts-pos)@rot`
-            # happens first), so `witness` here is ALREADY box-local -- no further transform needed.
-            witness_local_per_hand[f, h] = field.witness[box_channel, mask][nearest_local_idx]
+        for m, ch in enumerate(obj_channel_idxs):
+            for h, mask in enumerate(hand_point_masks):
+                hand_dist = field.distance[ch, mask]
+                nearest_local_idx = int(np.argmin(hand_dist))
+                dist_per_hand[f, m, h] = float(hand_dist[nearest_local_idx])
+                active_per_hand[f, m, h] = bool(field.active[ch, mask].any())
+                # witness of the point WITHIN this hand closest to this object (the actual nearest
+                # contact location). eval_fields transforms probes into the channel's OBJECT-local
+                # frame BEFORE sampling the SDF, so `witness` is ALREADY object-local -- no further
+                # transform needed.
+                witness_local_per_hand[f, m, h] = field.witness[ch, mask][nearest_local_idx]
 
-    contact_anchor_idx = dist_per_hand.argmin(axis=1).astype(np.int64)
-    contact_dist = dist_per_hand.min(axis=1)
-    contact_active = active_per_hand[np.arange(T), contact_anchor_idx]
-    witness_local = witness_local_per_hand[np.arange(T), contact_anchor_idx]  # (T, 3), box-local
+    # reduce over hands, per object -> (T, M) / (T, M, 3)
+    anchor_idx = dist_per_hand.argmin(axis=2).astype(np.int64)                 # (T, M)
+    contact_dist = np.take_along_axis(dist_per_hand, anchor_idx[:, :, None], axis=2)[:, :, 0]  # (T, M)
+    ti, mi = np.arange(T)[:, None], np.arange(M)[None, :]
+    contact_active = active_per_hand[ti, mi, anchor_idx]                       # (T, M)
+    witness_local = witness_local_per_hand[ti, mi, anchor_idx]                 # (T, M, 3)
 
     np.savez(
         args.out,
-        object_ref_contact=contact_active,
-        object_ref_contact_dist=contact_dist.astype(np.float32),
-        object_ref_anchor_idx=contact_anchor_idx,
-        object_ref_witness_local=witness_local.astype(np.float32),
+        # N-object arrays (canonical)
+        object_names=np.asarray(obj_names),
+        objects_ref_contact=contact_active,                                   # (T, M) bool
+        objects_ref_contact_dist=contact_dist.astype(np.float32),             # (T, M)
+        objects_ref_anchor_idx=anchor_idx,                                    # (T, M)
+        objects_ref_witness_local=witness_local.astype(np.float32),           # (T, M, 3) object-local
+        # legacy singular keys = object 0 (box) for backward compat
+        object_ref_contact=contact_active[:, 0],
+        object_ref_contact_dist=contact_dist[:, 0].astype(np.float32),
+        object_ref_anchor_idx=anchor_idx[:, 0],
+        object_ref_witness_local=witness_local[:, 0].astype(np.float32),
         dist_per_hand=dist_per_hand.astype(np.float32),
         active_per_hand=active_per_hand,
         hand_link_order=np.asarray(hand_link_order),
         fps=grounded.fps,
     )
+    for m, nm in enumerate(obj_names):
+        n_on = int(contact_active[:, m].sum())
+        print(f"[contact]   object '{nm}': {n_on}/{T} frames in contact ({100 * n_on / T:.1f}%)")
+    contact_active_obj0 = contact_active[:, 0]
+    contact_active = contact_active_obj0  # legacy var name used by the window print below
     n_on = int(contact_active.sum())
-    print(f"[contact] wrote {args.out}: {n_on}/{T} frames in contact ({100 * n_on / T:.1f}%)")
+    print(f"[contact] wrote {args.out}")
     d = np.diff(np.concatenate([[0], contact_active.astype(np.int8), [0]]))
     starts = np.flatnonzero(d == 1)
     ends = np.flatnonzero(d == -1) - 1
