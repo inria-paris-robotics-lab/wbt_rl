@@ -12,6 +12,11 @@ Saves <out>.npz: R (T,2,3,3) palm->camera, wrist2d (T,2,2), label (T,2) 0=Left/1
 valid (T,2). Optional --save-vis draws the palm axes for a sanity check.
 
 Run in the `mp` env (mediapipe + opencv + numpy); needs depth/ in the clip.
+
+--no-depth: skip the depth-based palm normal, only detect presence (bbox +
+wrist2d + label). R stays identity -- fine for extract_hands_hamer.py, which
+ignores this file's R and rebuilds orientation from HaMeR's own 3D joints.
+Use when there's no metric depth (e.g. a non-Femto video).
 """
 
 import argparse
@@ -44,6 +49,8 @@ def main():
     ap.add_argument("--model", default=DEFAULT_MODEL, help="hand_landmarker.task path")
     ap.add_argument("--save-vis", action="store_true", help="write axis-overlay frames to hands_vis/")
     ap.add_argument("--min-conf", type=float, default=0.5)
+    ap.add_argument("--no-depth", action="store_true",
+                    help="no metric depth: only bbox/wrist2d/label, R stays identity")
     args = ap.parse_args()
 
     import cv2
@@ -53,12 +60,12 @@ def main():
     from PIL import Image
 
     rgb = sorted(glob.glob(os.path.join(args.clip_dir, "rgb", "*.png")))
-    dep = sorted(glob.glob(os.path.join(args.clip_dir, "depth", "*.png")))
-    if not rgb or not dep:
-        raise SystemExit(f"[hands] need rgb/ and depth/ in {args.clip_dir}")
+    dep = [] if args.no_depth else sorted(glob.glob(os.path.join(args.clip_dir, "depth", "*.png")))
+    if not rgb or (not args.no_depth and not dep):
+        raise SystemExit(f"[hands] need rgb/ (+ depth/ unless --no-depth) in {args.clip_dir}")
     K = np.loadtxt(os.path.join(args.clip_dir, "cam_K.txt"))
     fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
-    T = min(len(rgb), len(dep))
+    T = len(rgb) if args.no_depth else min(len(rgb), len(dep))
     H, W = cv2.imread(rgb[0]).shape[:2]
     out = args.out or os.path.join(args.clip_dir, "hands.npz")
     vis_dir = os.path.join(args.clip_dir, "hands_vis")
@@ -83,12 +90,19 @@ def main():
 
     for t in range(T):
         img = cv2.imread(rgb[t])
-        depth = np.asarray(Image.open(dep[t]))                # uint16 mm, aligned to color
+        depth = None if args.no_depth else np.asarray(Image.open(dep[t]))  # uint16 mm, aligned to color
         rgb_img = np.ascontiguousarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         res = landmarker.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_img),
                                           int(t * 1000 / 30))
         for s in range(min(2, len(res.hand_landmarks))):
             lm = res.hand_landmarks[s]
+            allxy = np.array([(l.x * W, l.y * H) for l in lm])
+            if args.no_depth:                                  # presence only, R stays identity
+                wrist2d[t, s] = (lm[0].x * W, lm[0].y * H)
+                box[t, s] = [allxy[:, 0].min(), allxy[:, 1].min(), allxy[:, 0].max(), allxy[:, 1].max()]
+                label[t, s] = 0 if res.handedness[s][0].category_name == "Left" else 1
+                valid[t, s] = True
+                continue
             # palm normal: robust plane fit over ALL depth pixels inside the palm polygon
             poly = np.array([[lm[i].x * W, lm[i].y * H] for i in (0, 1, 5, 9, 13, 17)], np.float32)
             mask = np.zeros((H, W), np.uint8)
@@ -113,7 +127,6 @@ def main():
             y = y - (y @ z) * z; y /= np.linalg.norm(y) + 1e-9         # fingers, perp to normal
             R_all[t, s] = np.column_stack([np.cross(y, z), y, z])
             wrist2d[t, s] = (lm[0].x * W, lm[0].y * H)
-            allxy = np.array([(l.x * W, l.y * H) for l in lm])
             box[t, s] = [allxy[:, 0].min(), allxy[:, 1].min(), allxy[:, 0].max(), allxy[:, 1].max()]
             label[t, s] = 0 if res.handedness[s][0].category_name == "Left" else 1
             valid[t, s] = True
