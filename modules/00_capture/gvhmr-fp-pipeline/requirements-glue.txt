@@ -1,0 +1,10 @@
+# Glue deps (fuse.py / prepare_fp_inputs.py) ONLY.
+# GVHMR and FoundationPose each have their own conda env (see README);
+# do NOT install their deps here, they conflict.
+
+numpy
+opencv-python
+
+# Only for --coord world (gravity lift via SMPL joints):
+# torch          # already in the GVHMR env; else pip install torch
+# smplx          # pip install smplx  (+ SMPL/SMPL-X models in --smpl-model-dir)
