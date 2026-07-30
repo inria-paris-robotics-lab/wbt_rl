@@ -1,0 +1,4 @@
+# CMU / AMASS dataset metadata (SMPL-X N, body-only — same shape as SFU)
+raw_format: sfu_smplx_npz
+file_pattern: "**/*_stageii.npz"
+discover: single_files

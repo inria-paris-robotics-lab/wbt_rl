@@ -10,6 +10,7 @@ The folders below sit alongside this README:
 |--------|----------|---------|
 | `LAFAN/`    | LAFAN1 `.bvh` motions | LAFAN |
 | `SFU/`      | SFU AMASS `.npz` motions | SFU |
+| `CMU/`      | CMU AMASS `.npz` motions | CMU |
 | `OMOMO/`    | OMOMO sequences + objects | OMOMO (original) |
 | `OMOMO_new/`| InterMimic-processed OMOMO `.pt` | OMOMO_NEW |
 | `HODome/`   | HODome SMPL-X human + single-object poses/meshes | HODome |
@@ -51,6 +52,25 @@ SFU/
 1. Follow the [AMASS download instructions](https://amass.is.tue.mpg.de/) and select the **SFU** subset
    (SMPL-X N format) into `SFU/SFU/`
 2. SFU's body model is the shared **SMPL-X** under `models/` — see [Body models](#models--shared-body-models) below
+
+---
+
+## CMU/
+
+```
+CMU/
+└── CMU/
+    ├── 01/
+    │   ├── 01_01_stageii.npz
+    │   └── ...
+    ├── 63/  135/  ...          # per-subject AMASS folders
+    └── ...
+```
+
+1. Follow the [AMASS download instructions](https://amass.is.tue.mpg.de/) and select the **CMU** subset
+   (SMPL-X N format) into `CMU/CMU/`
+2. Like SFU, CMU is a body-only AMASS subset — same double-nested layout and shared **SMPL-X** body model
+   under `models/` (see [Body models](#models--shared-body-models) below); no objects
 
 ---
 

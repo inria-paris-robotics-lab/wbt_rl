@@ -5,6 +5,8 @@ data/00_raw_datasets/OMOMO/*
 !data/00_raw_datasets/OMOMO/.gitkeep
 data/00_raw_datasets/SFU/*
 !data/00_raw_datasets/SFU/.gitkeep
+data/00_raw_datasets/CMU/*
+!data/00_raw_datasets/CMU/.gitkeep
 data/00_raw_datasets/models/*
 !data/00_raw_datasets/models/.gitkeep
 

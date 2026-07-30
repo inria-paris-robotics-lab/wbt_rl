@@ -4,6 +4,7 @@
 native_input_format:
   LAFAN:      holosoma_npy
   SFU:        holosoma_smplx_npz
+  CMU:        holosoma_smplx_npz   # CMU AMASS subset = same SMPL-X N shape as SFU
   OMOMO:      holosoma_smplh_npz
   OMOMO_NEW:  holosoma_pt
 
