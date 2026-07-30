@@ -1,0 +1,10 @@
+# HoloNew / HoloV2 retargeter — WBT-RL module config
+# Repo: Guillaume-Bsst/HoloNew (HoloV2/). Export natif via `python -m src.viz.app --export`
+# (pas d'entry_points retarget.py : HoloV2 n'est pas piloté par scripts/retarget.py).
+native_output_format: holosoma_custom_qpos_npz
+# robot_config : DOCUMENTAIRE. Le flow ne le lit pas — train.py ne lit que
+# native_output_format, et le connector fait la FK avec le modèle MuJoCo de holosoma_custom
+# (retargeter_root codé en dur). Le --robot de train.py (G1_29dof) pilote le dof.
+robot_config:
+  G1_29dof:
+    urdf: modules/01_retargeting/HoloNew/HoloV2/models/g1/g1_29dof.urdf

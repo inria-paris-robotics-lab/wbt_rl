@@ -5,6 +5,8 @@ data/00_raw_datasets/OMOMO/*
 !data/00_raw_datasets/OMOMO/.gitkeep
 data/00_raw_datasets/SFU/*
 !data/00_raw_datasets/SFU/.gitkeep
+data/00_raw_datasets/CMU/*
+!data/00_raw_datasets/CMU/.gitkeep
 data/00_raw_datasets/models/*
 !data/00_raw_datasets/models/.gitkeep
 
@@ -16,6 +18,9 @@ data/00_raw_datasets/HODome/*
 
 data/00_raw_datasets/HOI-M3/*
 !data/00_raw_datasets/HOI-M3/.gitkeep
+
+data/00_raw_datasets/PA-HOI_Dataset/*
+!data/00_raw_datasets/PA-HOI_Dataset/.gitkeep
 
 data/01_retargeted_motions/*
 !data/01_retargeted_motions/README.md
@@ -49,3 +54,6 @@ docs/
 # Temporary probe/diag/eval outputs (not source)
 /Log/
 modules/Log/
+
+# Local logs / run outputs (heavy, local-only)
+/logs/

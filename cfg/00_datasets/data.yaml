@@ -11,6 +11,12 @@ raw_datasets:
     body_model: data/00_raw_datasets/models/models_smplx_v1_1/models
     body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
 
+  CMU:
+    # CMU AMASS subset (SMPL-X N format, body-only, no objects) — same shape as SFU.
+    path: data/00_raw_datasets/CMU/CMU
+    body_model: data/00_raw_datasets/models/models_smplx_v1_1/models
+    body_model_smplx: data/00_raw_datasets/models/models_smplx_v1_1/models/smplx
+
   OMOMO:
     path: data/00_raw_datasets/OMOMO/data
     body_model: data/00_raw_datasets/models/smplh
