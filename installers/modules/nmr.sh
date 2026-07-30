@@ -19,6 +19,10 @@ install_nmr() {
   _uv_pip "$ENV_ROOT" torch --index-url https://download.pytorch.org/whl/cu118
   _uv_pip "$ENV_ROOT" -r "$NMR_DIR/requirements.txt"
 
+  # Not in NMR's requirements.txt: the headless driver reads the 29 joint names
+  # out of NMR's MJCF (assets/g1_mocap_29dof.xml) via the mujoco Python API.
+  _uv_pip "$ENV_ROOT" mujoco==3.9.0
+
   _header "NMR weights (≈620 MB, one-off)"
   "$ENV_ROOT/bin/python" - <<PY
 from huggingface_hub import hf_hub_download
