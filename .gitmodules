@@ -28,3 +28,9 @@
 [submodule "modules/01_retargeting/HoloNew"]
 	path = modules/01_retargeting/HoloNew
 	url = https://github.com/Guillaume-Bsst/HoloNew.git
+[submodule "modules/third_party/PHC"]
+	path = modules/third_party/PHC
+	url = https://github.com/ZhengyiLuo/PHC.git
+[submodule "modules/01_retargeting/NMR"]
+	path = modules/01_retargeting/NMR
+	url = https://github.com/NJU3DV-HumanoidGroup/MakeTrackingEasy.git
