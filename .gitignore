@@ -19,6 +19,9 @@ data/00_raw_datasets/HODome/*
 data/00_raw_datasets/HOI-M3/*
 !data/00_raw_datasets/HOI-M3/.gitkeep
 
+data/00_raw_datasets/PA-HOI_Dataset/*
+!data/00_raw_datasets/PA-HOI_Dataset/.gitkeep
+
 data/01_retargeted_motions/*
 !data/01_retargeted_motions/README.md
 
@@ -48,3 +51,6 @@ Thumbs.db
 .idea/
 .pytest_cache/
 docs/
+
+# Local logs / run outputs (heavy, local-only)
+/logs/
