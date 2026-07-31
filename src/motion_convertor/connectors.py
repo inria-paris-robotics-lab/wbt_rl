@@ -33,7 +33,7 @@ def _sfu_to_holosoma(src, dst, **kw):
     from ._to_retargeter_input.sfu_holosoma import convert
     convert(src, dst)
 
-def _omomo_to_gmr(src, dst, **kw):
+def _omomo_to_smplx_npz(src, dst, **kw):
     from ._to_retargeter_input.omomo_gmr import convert
     convert(kw["seq_data"], dst)
 
@@ -91,6 +91,10 @@ def _holosoma_custom_to_holosoma_trainer(src, dst, **kw):
             output_fps=kw.get("output_fps", 50),
             object_name=kw.get("object_name", "ground"))
 
+def _nmr_to_unified(src, dst, **kw):
+    from ._to_unified_output.nmr import convert
+    convert(src, dst, kw["height"])
+
 
 CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     # Raw → retargeter native input
@@ -98,9 +102,11 @@ CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     ("lafan_bvh",               "holosoma_npy"):           _lafan_to_holosoma,
     ("sfu_smplx_npz",           "gmr_smplx_npz"):          _identity,
     ("sfu_smplx_npz",           "holosoma_smplx_npz"):     _sfu_to_holosoma,
-    ("omomo_smplh_p",           "gmr_smplx_npz"):          _omomo_to_gmr,
+    ("omomo_smplh_p",           "gmr_smplx_npz"):          _omomo_to_smplx_npz,
     ("omomo_smplh_p",           "holosoma_smplh_npz"):     _omomo_to_holosoma,
     ("omomo_new_pt",            "holosoma_pt"):             _identity,
+    ("sfu_smplx_npz",           "nmr_smplx_npz"):          _identity,
+    ("omomo_smplh_p",           "nmr_smplx_npz"):          _omomo_to_smplx_npz,
 
     # Raw → unified (to_unified_input path)
     ("lafan_bvh",               "unified_npz"):             _lafan_to_unified,
@@ -111,6 +117,7 @@ CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     ("gmr_pkl",                 "unified_npz"):             _gmr_to_unified,
     ("holosoma_qpos_npz",       "unified_npz"):             _holosoma_to_unified,
     ("holosoma_custom_qpos_npz", "unified_npz"):             _holosoma_custom_to_unified,
+    ("nmr_bmimic_npz",          "unified_npz"):             _nmr_to_unified,
 
     # Retargeter native output → trainer native input
     ("gmr_pkl",                 "holosoma_trainer_npz"):    _gmr_to_holosoma_trainer,

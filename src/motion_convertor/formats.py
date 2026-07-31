@@ -11,10 +11,12 @@ KNOWN_FORMATS: frozenset[str] = frozenset({
     "holosoma_smplx_npz",
     "holosoma_smplh_npz",
     "holosoma_pt",
+    "nmr_smplx_npz",        # retargeter native input
     # Retargeter native output formats
     "gmr_pkl",
     "holosoma_qpos_npz",
     "holosoma_custom_qpos_npz",
+    "nmr_bmimic_npz",       # retargeter native output
     # WBT-RL unified format
     "unified_npz",
     # Trainer native input formats
