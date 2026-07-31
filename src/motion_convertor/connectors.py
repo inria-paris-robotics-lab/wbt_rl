@@ -95,6 +95,14 @@ def _nmr_to_unified(src, dst, **kw):
     from ._to_unified_output.nmr import convert
     convert(src, dst, kw["height"])
 
+def _sfu_to_phc(src, dst, **kw):
+    from ._to_retargeter_input.sfu_phc import convert
+    convert(src, dst)
+
+def _phc_to_unified(src, dst, **kw):
+    from ._to_unified_output.phc import convert
+    convert(src, dst, kw["height"])
+
 
 CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     # Raw → retargeter native input
@@ -107,6 +115,7 @@ CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     ("omomo_new_pt",            "holosoma_pt"):             _identity,
     ("sfu_smplx_npz",           "nmr_smplx_npz"):          _identity,
     ("omomo_smplh_p",           "nmr_smplx_npz"):          _omomo_to_smplx_npz,
+    ("sfu_smplx_npz",           "phc_smpl_npz"):           _sfu_to_phc,
 
     # Raw → unified (to_unified_input path)
     ("lafan_bvh",               "unified_npz"):             _lafan_to_unified,
@@ -118,6 +127,7 @@ CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     ("holosoma_qpos_npz",       "unified_npz"):             _holosoma_to_unified,
     ("holosoma_custom_qpos_npz", "unified_npz"):             _holosoma_custom_to_unified,
     ("nmr_bmimic_npz",          "unified_npz"):             _nmr_to_unified,
+    ("phc_pkl",                 "unified_npz"):             _phc_to_unified,
 
     # Retargeter native output → trainer native input
     ("gmr_pkl",                 "holosoma_trainer_npz"):    _gmr_to_holosoma_trainer,

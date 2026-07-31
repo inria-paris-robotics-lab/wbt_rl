@@ -1,0 +1,31 @@
+# PHC retargeter — WBT-RL module config
+# Repo: https://github.com/ZhengyiLuo/PHC
+#
+# We use only PHC's retargeting front-end (fit_smpl_shape.py then fit_smpl_motion.py),
+# not its RL stack. It runs on OUR g1_29dof via cfg/01_retargeting/phc/robot/, injected
+# with hydra --config-dir so the submodule stays untouched.
+#
+# SFU only for now: PHC needs the poses/mocap_framerate schema, and the OMOMO path
+# currently produces the SMPL-X schema. Chaining the two is separate work — an
+# undeclared dataset fails loudly at config lookup, which is what we want.
+
+native_input_format:
+  SFU:       phc_smpl_npz
+
+native_output_format: phc_pkl
+
+entry_point_by_input_format:
+  phc_smpl_npz: smpl
+
+robot_config:
+  G1_29dof:
+    urdf: cfg/01_retargeting/phc/assets/g1_29dof_actuated.xml
+
+env: phc
+
+entry_points:
+  smpl:
+    cmd: python src/motion_convertor/wrappers/phc_smpl.py
+    args:
+      input:  --smpl_file
+      output: --save_path
