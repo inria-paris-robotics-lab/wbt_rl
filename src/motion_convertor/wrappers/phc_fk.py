@@ -47,7 +47,7 @@ def main():
     body_pos = out["global_translation"][0].detach().cpu().numpy()   # (T, B, 3)
 
     np.savez(args.out_path, body_pos_w=body_pos.astype(np.float32),
-             body_names=np.array(fk.body_names_augment))
+             body_names=np.array(fk.body_names))
     print(f"PHC FK → {args.out_path}: {body_pos.shape}")
 
 

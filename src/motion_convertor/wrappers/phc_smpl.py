@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).parents[3]
@@ -47,8 +48,23 @@ def main():
         amass_root.mkdir()
         shutil.copy2(src, amass_root / f"{src.stem}.npz")
 
+        # Staleness guard: PHC writes to a PERSISTENT path (outside our tempdir), keyed
+        # solely on `src.stem`. retarget.py names its input file deterministically per
+        # sequence, so that stem repeats on every re-run. If process_motion() skips the
+        # entry internally (amass_data is None in load_amass_data, or N < 10 frames),
+        # all_data stays empty, main() takes the `else` branch (writes v1/amass_all.pkl
+        # instead) and exits 0 — check=True never fires. A pkl left at this exact path by
+        # an earlier run of the SAME stem would then be unpacked and reported as THIS
+        # run's result, with zero error signal. We delete the pkl BEFORE launching the
+        # subprocess (if present), then afterwards verify it exists AND that its mtime
+        # postdates the launch (belt and suspenders: a pkl reappearing through some other
+        # means with a stale mtime is not enough).
+        produced = _PHC_ROOT / "data" / _HUMANOID_TYPE / "v1" / "singles" / f"0-{src.stem}.pkl"
+        produced.unlink(missing_ok=True)
+
         # amass_root/fit_all are not declared in PHC's own config.yaml (struct mode),
         # so a plain override is rejected — the "+" prefix adds them instead.
+        t_launch_wall = time.time()
         subprocess.run(
             [sys.executable, "scripts/data_process/fit_smpl_motion.py",
              "--config-dir", str(_CFG_DIR), "robot=unitree_g1_29dof_fitting",
@@ -57,9 +73,16 @@ def main():
             env={**os.environ, "WBT_ROOT": str(_REPO_ROOT)},
         )
 
-        produced = _PHC_ROOT / "data" / _HUMANOID_TYPE / "v1" / "singles" / f"0-{src.stem}.pkl"
         if not produced.exists():
-            raise RuntimeError(f"PHC produced nothing at {produced}")
+            raise RuntimeError(
+                f"PHC produced nothing at {produced} — process_motion() likely skipped "
+                f"the entry internally (amass_data is None, or N < 10 frames)"
+            )
+        if produced.stat().st_mtime < t_launch_wall:
+            raise RuntimeError(
+                f"{produced} exists but predates the subprocess launch: stale pkl from "
+                f"an earlier run of the same stem, PHC wrote nothing this time"
+            )
         shutil.move(str(produced), dst)
 
     print(f"PHC output → {dst}")
