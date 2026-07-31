@@ -3,6 +3,8 @@
 
 REPO_ROOT="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &>/dev/null && pwd )"
 GMR_DIR="$REPO_ROOT/modules/01_retargeting/GMR"
+NMR_DIR="$REPO_ROOT/modules/01_retargeting/NMR"
+PHC_DIR="$REPO_ROOT/modules/third_party/PHC"
 HOLOSOMA_SCRIPTS="$REPO_ROOT/modules/third_party/holosoma_custom/scripts"
 TEST_PIPE_SCRIPTS="$REPO_ROOT/modules/third_party/test_pipe/scripts"
 HOLONEW_SCRIPTS="$REPO_ROOT/modules/01_retargeting/HoloNew/scripts"

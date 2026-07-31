@@ -1,6 +1,8 @@
 pipe/wbt
 pipe/interact
 modules/gmr
+modules/nmr
+modules/phc
 modules/holosoma_retargeting
 modules/holosoma_training
 modules/holosoma_inference

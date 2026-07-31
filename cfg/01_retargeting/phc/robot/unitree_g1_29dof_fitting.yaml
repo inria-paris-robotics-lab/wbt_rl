@@ -1,0 +1,113 @@
+# PHC robot fitting config for OUR g1_29dof — lives OUTSIDE the PHC submodule and is
+# injected with hydra's --config-dir, so PHC stays bit-identical to upstream.
+#
+# PHC ships unitree_g1_fitting.yaml, but for a different robot: a G1 with 3-finger
+# hands, 37 dof-names, NO wrists and a single torso_link waist. Judging PHC on a robot
+# amputated of 5 useful dof would be a handicap that is not PHC's fault, so we give it
+# the same g1_29dof every other method in the benchmark is scored on.
+humanoid_type: g1_29dof
+bias_offset: False
+has_self_collision: False
+has_mesh: False
+has_jt_limit: False
+has_dof_subset: True
+has_upright_start: True
+has_smpl_pd_offset: False
+remove_toe: False
+motion_sym_loss: False
+sym_loss_coef: 1
+big_ankle: True
+
+has_shape_obs: false
+has_shape_obs_disc: false
+has_shape_variation: False
+
+masterfoot: False
+freeze_toe: false
+freeze_hand: False
+box_body: True
+real_weight: True
+real_weight_porpotion_capsules: True
+real_weight_porpotion_boxes: True
+
+body_names: ['pelvis',
+  'left_hip_pitch_link', 'left_hip_roll_link', 'left_hip_yaw_link', 'left_knee_link',
+  'left_ankle_pitch_link', 'left_ankle_roll_link',
+  'right_hip_pitch_link', 'right_hip_roll_link', 'right_hip_yaw_link', 'right_knee_link',
+  'right_ankle_pitch_link', 'right_ankle_roll_link',
+  'waist_yaw_link', 'waist_roll_link', 'torso_link',
+  'left_shoulder_pitch_link', 'left_shoulder_roll_link', 'left_shoulder_yaw_link',
+  'left_elbow_link', 'left_wrist_roll_link', 'left_wrist_pitch_link', 'left_wrist_yaw_link',
+  'right_shoulder_pitch_link', 'right_shoulder_roll_link', 'right_shoulder_yaw_link',
+  'right_elbow_link', 'right_wrist_roll_link', 'right_wrist_pitch_link', 'right_wrist_yaw_link']
+
+limb_weight_group:
+  - ['left_hip_pitch_link', 'left_hip_roll_link', 'left_hip_yaw_link', 'left_knee_link', 'left_ankle_pitch_link', 'left_ankle_roll_link']
+  - ['right_hip_pitch_link', 'right_hip_roll_link', 'right_hip_yaw_link', 'right_knee_link', 'right_ankle_pitch_link', 'right_ankle_roll_link']
+  - ['pelvis', 'waist_yaw_link', 'waist_roll_link', 'torso_link']
+  - ['left_shoulder_pitch_link', 'left_shoulder_roll_link', 'left_shoulder_yaw_link', 'left_elbow_link', 'left_wrist_roll_link', 'left_wrist_pitch_link', 'left_wrist_yaw_link']
+  - ['right_shoulder_pitch_link', 'right_shoulder_roll_link', 'right_shoulder_yaw_link', 'right_elbow_link', 'right_wrist_roll_link', 'right_wrist_pitch_link', 'right_wrist_yaw_link']
+
+dof_names: ['left_hip_pitch_link', 'left_hip_roll_link', 'left_hip_yaw_link', 'left_knee_link',
+  'left_ankle_pitch_link', 'left_ankle_roll_link',
+  'right_hip_pitch_link', 'right_hip_roll_link', 'right_hip_yaw_link', 'right_knee_link',
+  'right_ankle_pitch_link', 'right_ankle_roll_link',
+  'waist_yaw_link', 'waist_roll_link', 'torso_link',
+  'left_shoulder_pitch_link', 'left_shoulder_roll_link', 'left_shoulder_yaw_link',
+  'left_elbow_link', 'left_wrist_roll_link', 'left_wrist_pitch_link', 'left_wrist_yaw_link',
+  'right_shoulder_pitch_link', 'right_shoulder_roll_link', 'right_shoulder_yaw_link',
+  'right_elbow_link', 'right_wrist_roll_link', 'right_wrist_pitch_link', 'right_wrist_yaw_link']
+
+right_foot_name: 'right_ankle_roll_link'
+left_foot_name: 'left_ankle_roll_link'
+
+asset:
+  assetRoot: "./"
+  assetFileName: "${oc.env:WBT_ROOT}/cfg/01_retargeting/phc/assets/g1_29dof_actuated.xml"
+  urdfFileName: "${oc.env:WBT_ROOT}/cfg/01_retargeting/phc/assets/g1_29dof_actuated.xml"
+
+# Virtual joints PHC needs as fit targets: SMPL has a Head and Toes, our g1_29dof does not.
+extend_config:
+  - joint_name: "head_link"
+    parent_name: "torso_link"
+    pos: [0.0, 0.0, 0.4]
+    rot: [1.0, 0.0, 0.0, 0.0]
+  - joint_name: "left_toe_link"
+    parent_name: "left_ankle_roll_link"
+    pos: [0.08, 0.0, 0.0]
+    rot: [1.0, 0.0, 0.0, 0.0]
+  - joint_name: "right_toe_link"
+    parent_name: "right_ankle_roll_link"
+    pos: [0.08, 0.0, 0.0]
+    rot: [1.0, 0.0, 0.0, 0.0]
+
+base_link: "torso_link"
+
+# 16 correspondences. Unlike PHC's own G1, ours HAS wrists, so L_Hand/R_Hand map to the
+# wrist yaw links rather than to a finger root.
+joint_matches:
+  - ["pelvis", "Pelvis"]
+  - ["left_hip_pitch_link", "L_Hip"]
+  - ["left_knee_link", "L_Knee"]
+  - ["left_ankle_roll_link", "L_Ankle"]
+  - ["right_hip_pitch_link", "R_Hip"]
+  - ["right_knee_link", "R_Knee"]
+  - ["right_ankle_roll_link", "R_Ankle"]
+  - ["left_shoulder_roll_link", "L_Shoulder"]
+  - ["left_elbow_link", "L_Elbow"]
+  - ["left_wrist_yaw_link", "L_Hand"]
+  - ["right_shoulder_roll_link", "R_Shoulder"]
+  - ["right_elbow_link", "R_Elbow"]
+  - ["right_wrist_yaw_link", "R_Hand"]
+  - ["head_link", "Head"]
+  - ["left_toe_link", "L_Toe"]
+  - ["right_toe_link", "R_Toe"]
+
+# Rotates the SMPL T-pose into the robot's zero pose. Carried over from PHC's own G1
+# config: same Unitree zero-pose convention, so the same rotations apply.
+smpl_pose_modifier:
+  - Pelvis: "[np.pi/2, 0, np.pi/2]"
+  - L_Shoulder: "[0, 0, -np.pi/2]"
+  - R_Shoulder: "[0, 0, np.pi/2]"
+  - L_Elbow: "[0, -np.pi/2, 0]"
+  - R_Elbow: "[0, np.pi/2, 0]"

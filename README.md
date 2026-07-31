@@ -59,6 +59,8 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | Retargeter | Source | Datasets |
 |------------|--------|---------|
 | **GMR** | [YanjieZe/GMR](https://github.com/YanjieZe/GMR) | LAFAN1, SFU |
+| **NMR** | [NJU3DV/MakeTrackingEasy](https://github.com/NJU3DV-HumanoidGroup/MakeTrackingEasy) | SFU, OMOMO |
+| **PHC** | [ZhengyiLuo/PHC](https://github.com/ZhengyiLuo/PHC) | SFU |
 | **holosoma_retargeting** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | LAFAN1, SFU, OMOMO_NEW |
 | **holosoma_retargeting_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | LAFAN1, SFU, OMOMO_NEW |
 | **HoloNew** ⚠️ | [Guillaume-Bsst/HoloNew](https://github.com/Guillaume-Bsst/HoloNew) | experimental |
