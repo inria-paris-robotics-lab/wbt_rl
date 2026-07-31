@@ -7,7 +7,8 @@ its output after a key derived from the relative path. This wrapper gives it a
 single-file directory and moves the result to the requested path.
 
 Requires the shape fit (data/g1_29dof/shape_optimized_v1.pkl), produced once by
-fit_smpl_shape.py — see installers/modules/phc.sh.
+fit_smpl_shape.py — see the "ONE-TIME SHAPE FIT" comment block in
+installers/modules/phc.sh for the exact invocation.
 
 Usage:
     python src/motion_convertor/wrappers/phc_smpl.py \
@@ -37,7 +38,8 @@ def main():
     shape_pkl = _PHC_ROOT / "data" / _HUMANOID_TYPE / "shape_optimized_v1.pkl"
     if not shape_pkl.exists():
         raise SystemExit(f"Missing shape fit: {shape_pkl}\n"
-                         f"Run fit_smpl_shape.py once (see installers/modules/phc.sh).")
+                         f"Run fit_smpl_shape.py once (see the \"ONE-TIME SHAPE FIT\" "
+                         f"comment block in installers/modules/phc.sh).")
 
     src = Path(args.smpl_file)
     dst = Path(args.save_path)

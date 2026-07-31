@@ -8,8 +8,14 @@ Note: convert_to_bmimic re-origins the trajectory so the root starts at xy = 0. 
 NMR's own output convention and is preserved here; the trainer path re-bases motions
 anyway. The benchmark deliberately bypasses this format for that reason.
 
-NMR G1 body names → SMPL-X 22-joint mapping. 15 have direct equivalents; 7 use the
+NMR G1 body names → SMPL-X 22-joint mapping. 18 have direct equivalents; 4 use the
 nearest proxy, following the same convention as the GMR converter.
+
+FPS WARNING (latent, no connector reads this today): the registry/inference.py path calls
+convert_to_bmimic(..., tgt_fps=50.0), so NMR's bmimic npz is resampled to 50 fps, unlike
+GMR's 30 fps output. save_unified()/the unified npz schema carries no fps field — whoever
+writes an NMR→trainer connector needs to either resample to a common rate first or add an
+fps field to the unified format, or motions will silently play back at the wrong speed.
 """
 import numpy as np
 from pathlib import Path

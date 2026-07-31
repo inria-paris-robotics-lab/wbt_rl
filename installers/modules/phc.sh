@@ -9,6 +9,18 @@
 # chumpy IS required, despite looking like legacy baggage: the SMPL v1.1.0 .pkl body
 # models unpickle into chumpy objects. It imports numpy.bool/int/float, removed in
 # numpy 1.24 — hence the pin below, scoped to this isolated env only.
+#
+# ONE-TIME SHAPE FIT (not run by this script): src/motion_convertor/wrappers/phc_smpl.py
+# and Paper/adapters/phc_headless.py both require modules/third_party/PHC/data/g1_29dof/
+# shape_optimized_v1.pkl to exist before either can run. It is produced once by, from the
+# PHC root (modules/third_party/PHC), in the `phc` env, with WBT_ROOT set to the repo root:
+#
+#   WBT_ROOT=<repo_root> python scripts/data_process/fit_smpl_shape.py \
+#       --config-dir <repo_root>/cfg/01_retargeting/phc robot=unitree_g1_29dof_fitting
+#
+# The output is intentionally not committed (lives inside the PHC submodule, keyed to the
+# robot config); re-run the command above whenever data/g1_29dof/shape_optimized_v1.pkl is
+# missing or the fitting config changes.
 set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &>/dev/null && pwd)/lib.sh"
 
