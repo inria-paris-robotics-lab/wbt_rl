@@ -1,13 +1,16 @@
 <!-- GENERATED from g1_29dof.xml (sha256[:12]=8c586e4747da) by the PHC integration.
-     TWO transformations, both required — regenerating with only the first
+     THREE transformations, all required — regenerating with only the first
      silently resurrects an IndexError in PHC's forward_kinematics_batch:
        1. append an <actuator> block of 29 motors (Humanoid_Batch derives
           num_dof from it; our source MJCF has none);
        2. prune the 20 jointless geometry leaves, so the tree is strictly
-          one joint per body (30 bodies / 29 joints) as PHC assumes.
+          one joint per body (30 bodies / 29 joints) as PHC assumes;
+       3. repoint <compiler meshdir> at HoloV2's real mesh directory, since
+          this copy lives away from the meshes and PHC's load_mesh() joins
+          meshdir to THIS file's directory.
      Joint kinematics are untouched. Do not edit by hand: regenerate. -->
 <mujoco model="g1_29dof">
-  <compiler angle="radian" meshdir="assets/"/>
+  <compiler angle="radian" meshdir="../../../../modules/01_retargeting/HoloNew/HoloV2/models/g1/assets/"/>
 
   <asset>
     <mesh name="pelvis" content_type="model/obj" file="pelvis.obj"/>
