@@ -1,12 +1,16 @@
 <!-- GENERATED from g1_29dof.xml (sha256[:12]=8c586e4747da) by the PHC integration.
-     Identical kinematics, plus the <actuator> block PHC's Humanoid_Batch
-     requires to derive num_dof. Do not edit by hand: regenerate. -->
+     TWO transformations, both required — regenerating with only the first
+     silently resurrects an IndexError in PHC's forward_kinematics_batch:
+       1. append an <actuator> block of 29 motors (Humanoid_Batch derives
+          num_dof from it; our source MJCF has none);
+       2. prune the 20 jointless geometry leaves, so the tree is strictly
+          one joint per body (30 bodies / 29 joints) as PHC assumes.
+     Joint kinematics are untouched. Do not edit by hand: regenerate. -->
 <mujoco model="g1_29dof">
   <compiler angle="radian" meshdir="assets/"/>
 
   <asset>
     <mesh name="pelvis" content_type="model/obj" file="pelvis.obj"/>
-    <mesh name="pelvis_contour_link" content_type="model/obj" file="pelvis_contour_link.obj"/>
     <mesh name="left_hip_pitch_link" content_type="model/obj" file="left_hip_pitch_link.obj"/>
     <mesh name="left_hip_roll_link" content_type="model/obj" file="left_hip_roll_link.obj"/>
     <mesh name="left_hip_yaw_link" content_type="model/obj" file="left_hip_yaw_link.obj"/>
@@ -32,7 +36,6 @@
     <mesh name="left_wrist_roll_link" content_type="model/obj" file="left_wrist_roll_link.obj"/>
     <mesh name="left_wrist_pitch_link" content_type="model/obj" file="left_wrist_pitch_link.obj"/>
     <mesh name="left_wrist_yaw_link" content_type="model/obj" file="left_wrist_yaw_link.obj"/>
-    <mesh name="left_rubber_hand_link" content_type="model/obj" file="left_rubber_hand.obj"/>
     <mesh name="right_shoulder_pitch_link" content_type="model/obj" file="right_shoulder_pitch_link.obj"/>
     <mesh name="right_shoulder_roll_link" content_type="model/obj" file="right_shoulder_roll_link.obj"/>
     <mesh name="right_shoulder_yaw_link" content_type="model/obj" file="right_shoulder_yaw_link.obj"/>
@@ -40,7 +43,6 @@
     <mesh name="right_wrist_roll_link" content_type="model/obj" file="right_wrist_roll_link.obj"/>
     <mesh name="right_wrist_pitch_link" content_type="model/obj" file="right_wrist_pitch_link.obj"/>
     <mesh name="right_wrist_yaw_link" content_type="model/obj" file="right_wrist_yaw_link.obj"/>
-    <mesh name="right_rubber_hand_link" content_type="model/obj" file="right_rubber_hand.obj"/>
 
   </asset>
 
