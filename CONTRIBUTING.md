@@ -10,6 +10,12 @@ everything from `cfg/` at runtime.
 
 > Throughout, `NN_stage` is one of `01_retargeting`, `02_training`, `03_inference`, `04_deployment`, and
 > `<module>` is your new module's short name (e.g. `gmr`, `holosoma_custom`).
+>
+> `05_dynamics` is a fifth, **optional** stage that hangs off the side of the pipeline rather than sitting
+> in it: it enriches an existing retargeting run with torques and contact forces instead of feeding the
+> next stage. It follows the same checklist, with two documented deviations — its module is venv-managed
+> rather than conda-managed (`venv_run()` instead of `conda_run()`), and it ships a patch under
+> `installers/patches/` because upstream cannot express its use case. See `cfg/05_dynamics/spider.yaml`.
 
 ---
 

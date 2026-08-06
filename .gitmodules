@@ -34,3 +34,6 @@
 [submodule "modules/01_retargeting/NMR"]
 	path = modules/01_retargeting/NMR
 	url = https://github.com/NJU3DV-HumanoidGroup/MakeTrackingEasy.git
+[submodule "modules/third_party/spider"]
+	path = modules/third_party/spider
+	url = https://github.com/facebookresearch/spider.git

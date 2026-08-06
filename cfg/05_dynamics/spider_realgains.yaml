@@ -1,0 +1,65 @@
+# SPIDER — variant of spider.yaml for the real-G1-actuator-gains experiment.
+#
+# Paired with --robot-assets pointing at a copy of the stock unitree_g1 asset
+# whose actuator kp/kv (and joint armature) are patched to match
+# holosoma_custom's g1_29dof training gains instead of SPIDER's stock
+# kp=500/dampratio=1/armature=1.0 (see config_values/robot.py:488-534).
+#
+# sanity_check_seconds disabled: it holds ctrl_ref[0] fixed for 3s with no
+# active control, which the stock kp=500 rig survives trivially but the real
+# ~14-99 Nm/rad wrist/arm gains cannot -- gravity sag opens the grip before
+# the actual MPC (which adjusts targets every replan) ever gets a chance to
+# compensate. Not evidence of solver instability by itself; revisit if the
+# resulting trajectory itself turns out to be poorly tracked.
+
+venv: modules/third_party/spider/.venv
+module_root: modules/05_dynamics/spider
+robot_assets: modules/third_party/spider/spider/assets/robots/unitree_g1
+
+native_input_format: spider_scene_npz
+native_output_format: spider_dynamics_npz
+
+cmd: python examples/run_mjwp.py
+
+base_overrides:
+  - +override=humanoid_object
+  - embodiment_type=humanoid_nobj
+  - contact_guidance=true
+  - +use_torch_compile=false
+  - viewer=""
+  - show_viewer=false
+  - save_video=false
+  - nconmax_per_env=300
+  - njmax_per_env=1400
+  - +sanity_check_seconds=0.0
+  # joint_noise_scale (0.1 in humanoid_object.yaml) is an ABSOLUTE ctrl-space
+  # perturbation, uniform across all robot joints regardless of their kp. It
+  # was implicitly tuned for the stock kp=500 rig: at real G1 gains (kp
+  # 14.25-99.1, see robot_assets patch) the same 0.1 rad perturbation induces
+  # 5-35x less exploratory torque, so the CEM can no longer discover a
+  # gravity-compensating / gripping trajectory within num_samples x
+  # max_num_iterations -- it settles for the arm sagging instead. Bumped x20
+  # (mid-point of the 5-35x kp drop) to compensate; revisit per-joint if this
+  # over/under-shoots.
+  - joint_noise_scale=2.0
+
+args:
+  task:               task
+  data_id:            data_id
+  robot_type:         robot_type
+  dataset_name:       dataset_name
+  dataset_dir:        dataset_dir
+  num_objects:        +num_objects
+  num_samples:        num_samples
+  max_num_iterations: max_num_iterations
+  sim_dt:             sim_dt
+  ref_dt:             ref_dt
+  trace_dt:           trace_dt
+
+defaults:
+  robot_type: unitree_g1
+  num_samples: 1024
+  max_num_iterations: 8
+  sim_dt: 0.01
+  ref_dt: 0.02
+  trace_dt: 0.02

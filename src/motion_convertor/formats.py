@@ -19,6 +19,9 @@ KNOWN_FORMATS: frozenset[str] = frozenset({
     "unified_npz",
     # Trainer native input formats
     "holosoma_trainer_npz",
+    # Dynamics-enrichment formats (stage 05)
+    "spider_scene_npz",      # SPIDER's trajectory_kinematic_act.npz + scene.xml
+    "spider_dynamics_npz",   # WBT-RL sidecar: qpos/qvel/tau + contact forces
     # Policy formats
     "policy_onnx",
     "policy_pt",

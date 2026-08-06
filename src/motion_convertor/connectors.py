@@ -83,6 +83,23 @@ def _holosoma_custom_to_unified(src, dst, **kw):
     from ._to_unified_output.holosoma import convert
     convert(src, dst, kw["height"])
 
+def _holosoma_trainer_to_spider_scene(src, dst, **kw):
+    # `dst` is the SPIDER task DIRECTORY here, not a single file: the stage emits
+    # scene.xml + task_info.json + {data_id}/trajectory_kinematic_act.npz.
+    from ._to_dynamics_input.spider import convert
+    convert(src, dst,
+            scene_manifest=kw["scene_manifest"],
+            robot_assets=kw.get("robot_assets"),
+            data_id=kw.get("data_id", "0"),
+            fps=kw.get("fps", 0))
+
+def _spider_run_to_dynamics(src, dst, **kw):
+    # `src` is the finished SPIDER task directory.
+    from ._to_dynamics_output.spider import convert
+    convert(src, dst,
+            data_id=kw.get("data_id", "0"),
+            ref_frames=kw.get("ref_frames", 0))
+
 def _holosoma_custom_to_holosoma_trainer(src, dst, **kw):
     from ._to_trainer_input.holosoma_custom_holosoma import convert
     convert(src, dst,
@@ -116,4 +133,8 @@ CONNECTORS: dict[tuple[str, str], Callable[..., None]] = {
     ("gmr_pkl",                 "holosoma_trainer_npz"):    _gmr_to_holosoma_trainer,
     ("holosoma_qpos_npz",       "holosoma_trainer_npz"):    _holosoma_to_holosoma_trainer,
     ("holosoma_custom_qpos_npz", "holosoma_trainer_npz"):    _holosoma_custom_to_holosoma_trainer,
+
+    # Trainer input → dynamics enrichment (stage 05), and back out again
+    ("holosoma_trainer_npz",    "spider_scene_npz"):        _holosoma_trainer_to_spider_scene,
+    ("spider_scene_npz",        "spider_dynamics_npz"):     _spider_run_to_dynamics,
 }
