@@ -17,12 +17,15 @@ def convert(
     out_path: Path | str,
     data_id: str = "0",
     ref_frames: int = 0,
+    smooth_window: int = 21,
     **kwargs,
 ) -> None:
-    """Extract qpos/qvel/tau + per-pair contact forces from a SPIDER run.
+    """Extract qpos/qvel/tau(+tau_inverse) + per-pair contact forces from a SPIDER run.
 
     `ref_frames` resamples the sim-rate rollout back onto the retargeted clip's
-    frame count; 0 keeps SPIDER's native rate.
+    frame count; 0 keeps SPIDER's native rate. `smooth_window` is the
+    Savitzky-Golay window (samples) used to smooth qacc for `tau_inverse` --
+    see spider_extract_dynamics.py's docstring for why it exists.
     """
     cfg = load_module_cfg("05_dynamics", "spider")
     root = repo_root()
@@ -33,5 +36,6 @@ def convert(
         f" --data-id {data_id}"
         f" --out {Path(out_path)}"
         f" --ref-frames {int(ref_frames)}"
+        f" --smooth-window {int(smooth_window)}"
     )
     venv_run(str(root / cfg["venv"]), cmd, cwd=root)

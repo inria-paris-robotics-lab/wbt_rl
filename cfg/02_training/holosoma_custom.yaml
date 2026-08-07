@@ -30,6 +30,13 @@ robot_exp_map:
         robot_only: g1-29dof-wbt
         with_object: g1-29dof-wbt-w-object
         with_object_actor: g1-29dof-wbt-w-object-actor
+        # Etage 05 (--dynamics) : meme tache/robot/observation que with_object_actor, mais le clip
+        # enrichi par scripts/merge_dynamics.py alimente les rewards de contact/couple, le profil de
+        # force de prise et le feed-forward de couple. train.py verifie que les clips portent bien
+        # les champs dyn_* avant de lancer (sinon tous ces termes valent 0 en silence).
+        # Preset d'ETUDE : le feed-forward de couple n'est pas encore rejouable par
+        # holosoma_inference, donc une policy entrainee ici n'est pas deployable telle quelle.
+        with_object_actor_grip_force_dyn: g1-29dof-wbt-w-object-actor-grip-force-dyn
       fast_sac:
         robot_only: g1-29dof-wbt-fast-sac
         with_object: g1-29dof-wbt-fast-sac-w-object

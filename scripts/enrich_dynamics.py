@@ -152,6 +152,9 @@ def main() -> None:
                         "robot_assets) -- e.g. to A/B different actuator gains")
     p.add_argument("--num-samples", type=int)
     p.add_argument("--max-iterations", type=int)
+    p.add_argument("--sim-dt", type=float,
+                   help="override the module's sim_dt -- e.g. to check whether a contact-force "
+                        "reading is numerically converged rather than a discretization artifact")
     p.add_argument("--keep-work", action="store_true",
                    help="keep SPIDER's scene + raw rollout (default: kept; use for clarity)")
     args = p.parse_args()
@@ -173,7 +176,7 @@ def main() -> None:
     overrides = {
         "num_samples": args.num_samples or cfg["defaults"]["num_samples"],
         "max_num_iterations": args.max_iterations or cfg["defaults"]["max_num_iterations"],
-        "sim_dt": cfg["defaults"]["sim_dt"],
+        "sim_dt": args.sim_dt or cfg["defaults"]["sim_dt"],
         "ref_dt": cfg["defaults"]["ref_dt"],
         "trace_dt": cfg["defaults"]["trace_dt"],
     }

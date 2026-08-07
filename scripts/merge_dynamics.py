@@ -79,7 +79,15 @@ def convert(motion_path: Path, sidecar_path: Path, out_path: Path) -> None:
     for k, side in enumerate(_SIDES):
         obj_contact_lr[:, k], grip_force_lr[:, k] = _aggregate(
             contact_mask, contact_force, pairs,
-            lambda p, side=side: p.endswith(f"__{object_geom}") and f"{side}_wrist" in p,
+            # "wrist_yaw" specifically, not "wrist" -- a full-body collision scene (see
+            # femto14_box36_fullbody.yaml) also pairs wrist_ROLL and wrist_PITCH hull geoms
+            # (forearm segments) against the box, and both contain "{side}_wrist" as a substring.
+            # Those are legitimate body contact but NOT a grip: counting them here silently
+            # inflated dyn_obj_contact_lr / dyn_grip_force_lr with forearm-against-box contact,
+            # which then leaks into GripForceCfg's squeeze-force command and the bimanual grasp
+            # rewards as if the hand were gripping. Only wrist_yaw carries the hand geometry
+            # (rubber cvx hull or half-sphere hull), in both existing naming conventions.
+            lambda p, side=side: p.endswith(f"__{object_geom}") and f"{side}_wrist_yaw" in p,
         )
         foot_contact_lr[:, k], foot_grf_lr[:, k] = _aggregate(
             contact_mask, contact_force, pairs,

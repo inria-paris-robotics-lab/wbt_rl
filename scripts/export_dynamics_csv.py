@@ -47,10 +47,15 @@ def main() -> None:
     # Real Unitree G1 hardware torque limits (this MJCF sets none anywhere --
     # neither actuator_forcerange nor jnt_actfrcrange -- see
     # scripts/view_dynamics_contacts.py for the same table and why).
+    # Verified against the official Unitree g1_29dof.urdf (<limit effort=...>,
+    # modules/04_deployment/unitree_ros2/.../unitree_description/model/g1/) --
+    # waist_pitch/waist_roll were previously transcribed as 50 (a stale copy
+    # from holosoma_custom's robot.py); the real hardware limit is 35, same as
+    # the ankles.
     g1_limit_nm = {
         "hip_pitch": 88.0, "hip_roll": 139.0, "hip_yaw": 88.0, "knee": 139.0,
         "ankle_pitch": 35.0, "ankle_roll": 35.0,
-        "waist_yaw": 88.0, "waist_pitch": 50.0, "waist_roll": 50.0,
+        "waist_yaw": 88.0, "waist_pitch": 35.0, "waist_roll": 35.0,
         "shoulder_pitch": 25.0, "shoulder_roll": 25.0, "shoulder_yaw": 25.0,
         "elbow": 25.0, "wrist_roll": 25.0, "wrist_pitch": 5.0, "wrist_yaw": 5.0,
     }
