@@ -240,7 +240,12 @@ def _draw_ghost(viewer, ref_qpos: np.ndarray, obj: slice | None) -> None:
         pos = ref_qpos[obj][:3].copy()
         mat = np.zeros(9)
         quat = np.zeros(4)
-        mujoco.mju_euler2Quat(quat, ref_qpos[obj][3:6].copy(), "XYZ")
+        # Lower case, not "XYZ": spider_build_scene writes these angles with
+        # scipy's `as_euler("XYZ")`, which is INTRINSIC, and mju_euler2Quat
+        # spells intrinsic in lower case (upper case is extrinsic). The same
+        # three letters mean opposite things in the two libraries; reading them
+        # back as "XYZ" turns the ghost box by ~100 deg on this clip.
+        mujoco.mju_euler2Quat(quat, ref_qpos[obj][3:6].copy(), "xyz")
         mujoco.mju_quat2Mat(mat, quat)
         add(mujoco.mjtGeom.mjGEOM_BOX, np.array([0.18, 0.18, 0.18]), pos, mat, _GHOST_BOX)
 
