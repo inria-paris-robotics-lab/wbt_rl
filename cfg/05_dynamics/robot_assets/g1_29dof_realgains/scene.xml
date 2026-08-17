@@ -30,7 +30,7 @@
             </default>
             <site group="5" rgba="1 0 0 1" />
             <geom condim="1" contype="0" conaffinity="0" />
-            <position kp="500" dampratio="1" inheritrange="1" />
+            <position inheritrange="1" />
             <joint damping="0.0" armature="0.001" frictionloss="0.0" />
             <default class="hip">
                 <default class="hip_pitch">

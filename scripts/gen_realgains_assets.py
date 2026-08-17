@@ -150,15 +150,17 @@ def build(source: Path, gains_py: Path, out_dir: Path, symbol: str,
         raise ValueError(f"no <default class=...> for gain families: {sorted(missing)}")
     print(f"gains      written on {len(touched)} default classes")
 
-    # Parent classes keep kp=500 and would leak it to any actuator that sits
-    # directly in them rather than in a leaf. Strip those so a miss is a load
-    # error, not a silently stiff joint.
+    # Parent classes ("g1", "ankle", "wrist") keep the stock kp=500 and would
+    # leak it to any actuator sitting directly in them rather than in a leaf.
+    # Strip every one of them: an unmatched actuator then falls back to
+    # MuJoCo's kp=1, which is visibly wrong, instead of inheriting a stiffness
+    # 5-35x the real robot's that no plot would ever reveal.
     for dflt in root.iter("default"):
         cls = dflt.get("class")
         if cls in stiffness or cls is None:
             continue
         pos = dflt.find("position")
-        if pos is not None and pos.get("kp") is not None and cls != "g1":
+        if pos is not None and pos.get("kp") is not None:
             pos.attrib.pop("kp", None)
             pos.attrib.pop("dampratio", None)
             print(f"           cleared inherited kp on parent class {cls!r}")
