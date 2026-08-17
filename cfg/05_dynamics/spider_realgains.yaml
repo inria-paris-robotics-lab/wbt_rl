@@ -30,7 +30,15 @@ base_overrides:
   - show_viewer=false
   - save_video=false
   - nconmax_per_env=300
-  - njmax_per_env=1400
+  # 1400 is spider.yaml's value, sized on the stock kp=500 rig. It does not
+  # survive here: at real gains, with joint_noise_scale bumped x20 below, the
+  # CEM samples flail hard enough that a femto14 run asked for up to 3677
+  # constraint rows and spent its whole length printing "nefc overflow",
+  # i.e. silently DROPPING constraints -- degraded physics, not a slow run.
+  # 6000 covers the measured peak with the same kind of margin spider.yaml
+  # takes over its own stress test. Contacts themselves never overflowed, so
+  # nconmax stays put.
+  - njmax_per_env=6000
   - +sanity_check_seconds=0.0
   # joint_noise_scale (0.1 in humanoid_object.yaml) is an ABSOLUTE ctrl-space
   # perturbation, uniform across all robot joints regardless of their kp. It
