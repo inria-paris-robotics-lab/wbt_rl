@@ -1,0 +1,64 @@
+# SPIDER — physics-informed dynamics enrichment (stage 05)
+# Repo: https://github.com/facebookresearch/spider  (Meta/FAIR)
+#
+# ⚠ LICENCE: SPIDER is CC BY-NC 4.0 — non-commercial use only. This is the only
+# module in WBT-RL with a non-commercial licence; keep that in mind before
+# depending on stage 05 in anything that ships.
+#
+# Unlike stages 01-04 this module is NOT installed into a conda env: upstream
+# ships a `uv sync` workflow, so it lives in a venv inside the submodule and is
+# invoked through `venv_run()` rather than `conda_run()`.
+
+venv: modules/third_party/spider/.venv
+module_root: modules/05_dynamics/spider
+robot_assets: modules/third_party/spider/spider/assets/robots/unitree_g1
+
+native_input_format: spider_scene_npz
+native_output_format: spider_dynamics_npz
+
+cmd: python examples/run_mjwp.py
+
+# SPIDER is driven by Hydra, so overrides are `key=value` tokens, not `--flag
+# value` pairs like the other stages. A leading `+` adds a key Hydra's struct
+# mode would otherwise reject (it is in the Config dataclass but absent from the
+# shipped yamls).
+base_overrides:
+  - +override=humanoid_object      # closest stock preset; every field below overrides it
+  - embodiment_type=humanoid_nobj  # added by installers/patches/spider-humanoid-nobj.patch
+  - contact_guidance=true          # anneal virtual object actuators to zero
+  - +use_torch_compile=false       # needs python3-dev headers we do not require
+  - viewer=""
+  - show_viewer=false
+  - save_video=false
+  # humanoid_object's default nconmax_per_env=120 / njmax_per_env=350 sized for
+  # the stock 4-sphere-feet / 1-sphere-hand collision. The convex-hull rebuild
+  # (scripts/build_convex_spider.py) measured a real-clip worst case of ~40 and
+  # a controller-less full-fall stress test up to ~155 -- bumped here with
+  # margin on top of that, not the real-clip number, since MPC exploration can
+  # sample states well outside the reference trajectory.
+  - nconmax_per_env=300
+  - njmax_per_env=1400
+
+args:
+  task:               task
+  data_id:            data_id
+  robot_type:         robot_type
+  dataset_name:       dataset_name
+  dataset_dir:        dataset_dir
+  num_objects:        +num_objects
+  num_samples:        num_samples
+  max_num_iterations: max_num_iterations
+  sim_dt:             sim_dt
+  ref_dt:             ref_dt
+  trace_dt:           trace_dt
+
+defaults:
+  robot_type: unitree_g1
+  # CEM budget. 1024 samples needs ~4 GB of GPU on top of the model; drop to 512
+  # or 256 when sharing the card with a training job (an OOM here surfaces as
+  # "Warp CUDA error 2: out of memory" during put_data).
+  num_samples: 1024
+  max_num_iterations: 8
+  sim_dt: 0.01
+  ref_dt: 0.02
+  trace_dt: 0.02

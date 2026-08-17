@@ -1,0 +1,20 @@
+# Diagnostic variant of spider.yaml with contact_guidance disabled entirely.
+#
+# Used to empirically settle whether an object stays gripped/lifted under REAL
+# contact physics alone, with zero virtual assist at any point (not just the
+# guidance-annealed-to-zero final CEM iteration spider.yaml already uses).
+# Compare the two runs' object trajectories -- if the box still lifts and
+# holds here, the grasp was real.
+
+base: spider
+
+base_overrides:
+  - +override=humanoid_object
+  - embodiment_type=humanoid_nobj
+  - contact_guidance=false          # <-- the only change from spider.yaml
+  - +use_torch_compile=false
+  - viewer=""
+  - show_viewer=false
+  - save_video=false
+  - nconmax_per_env=300
+  - njmax_per_env=1400

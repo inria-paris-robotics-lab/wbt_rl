@@ -161,11 +161,45 @@ def prepare_trainer_inputs(retarget_run: Path, retargeter: str, trainer: str, ro
     return trainer_input_paths, run_object_urdf, run_object_scale
 
 
+_DYN_REQUIRED_KEYS = ("dyn_tau", "dyn_foot_contact_lr", "dyn_foot_grf_lr", "dyn_obj_contact_lr")
+
+
+def _assert_dynamics_clip(motion_path: Path) -> None:
+    """Fail loudly when a --dynamics run is pointed at a clip that was never enriched.
+
+    run_training always overrides the experiment preset's own motion_file with the retarget run's
+    output (see the arg_map wiring below), so selecting the stage-05 experiment is NOT enough to
+    actually train on stage-05 data. Every dyn reward term and the torque feed-forward are written
+    to return 0 / disable themselves on a clip without the sidecar fields — which is the right
+    behaviour for backward compatibility, but means a mis-pointed --dynamics run would train
+    happily, log a plausible curve, and be silently identical to the non-dyn preset.
+
+    An .npz is a zip of .npy members, so the key list is readable without numpy (this script runs in
+    the outer env, not the trainer's).
+    """
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(motion_path) as z:
+            keys = {n[:-4] if n.endswith(".npy") else n for n in z.namelist()}
+    except (OSError, zipfile.BadZipFile) as e:
+        raise ValueError(f"--dynamics: cannot read motion clip {motion_path}: {e}") from e
+
+    missing = [k for k in _DYN_REQUIRED_KEYS if k not in keys]
+    if missing:
+        raise ValueError(
+            f"--dynamics requires a clip enriched by stage 05, but {motion_path.name} is missing "
+            f"{missing}. Run scripts/merge_dynamics.py to fuse a SPIDER sidecar into this clip "
+            f"first — training would otherwise run with every dyn reward term silently returning 0."
+        )
+
+
 def _resolve_exp_name(cfg: dict, robot: str, simulator: str, algo: str, with_object: bool,
-                      with_object_actor: bool = False) -> str:
+                      with_object_actor: bool = False, dynamics: bool = False) -> str:
     """Look up the holosoma exp: subcommand name from robot_exp_map.
 
-    robot_exp_map structure: {robot → {simulator → {algo → {robot_only|with_object|with_object_actor → exp_name}}}}
+    robot_exp_map structure: {robot → {simulator → {algo → {robot_only|with_object|with_object_actor
+    |with_object_actor_grip_force_dyn → exp_name}}}}
     Raises ValueError with a clear message when the combination is unsupported.
     """
     robot_exp_map = cfg.get("robot_exp_map", {})
@@ -190,7 +224,9 @@ def _resolve_exp_name(cfg: dict, robot: str, simulator: str, algo: str, with_obj
             f"Supported algorithms: {list(sim_entry)}"
         )
 
-    if with_object_actor:
+    if dynamics:
+        task_key = "with_object_actor_grip_force_dyn"
+    elif with_object_actor:
         task_key = "with_object_actor"
     elif with_object:
         task_key = "with_object"
@@ -218,6 +254,7 @@ def run_training(
     checkpoint: str | None,
     object_urdf: str | None = None,
     with_object_actor: bool = False,
+    dynamics: bool = False,
     no_video: bool = False,
 ) -> None:
     """Launch the trainer subprocess."""
@@ -228,7 +265,7 @@ def run_training(
     env_vars = sim_cfg.get("env_vars")
     arg_map = cfg.get("args", {})
 
-    exp_name = _resolve_exp_name(cfg, robot, simulator, algo, with_object, with_object_actor)
+    exp_name = _resolve_exp_name(cfg, robot, simulator, algo, with_object, with_object_actor, dynamics)
 
     # tyro requires all positional subcommands before any --flag arguments
     cmd = base_cmd
@@ -239,6 +276,12 @@ def run_training(
 
     if not trainer_input_paths:
         raise ValueError(f"No trainer sequences found. Ensure retargeting outputs are present.")
+
+    if dynamics:
+        # Every clip the trainer will load, not just the first: with motion_dir the whole directory
+        # is consumed, and a single un-enriched clip in the mix would train dyn-blind on that clip.
+        for p in trainer_input_paths:
+            _assert_dynamics_clip(p)
 
     if "motion_dir" in arg_map:
         motion_input = trainer_input_paths[0].parent
@@ -284,6 +327,13 @@ def main():
     parser.add_argument("--with-object-actor", action="store_true",
                         help="Train with object in scene — object pose in both actor and critic obs."
                              " Implies --with-object. Only supported for PPO.")
+    parser.add_argument("--dynamics", action="store_true",
+                        help="Train on the stage-05 (SPIDER) preset: reference foot-contact schedule,"
+                             " load share, slip and torque-envelope rewards, bimanual grasp rewards,"
+                             " measured grip-force profile and torque feed-forward."
+                             " Implies --with-object-actor. Requires clips enriched by"
+                             " scripts/merge_dynamics.py — the run aborts if they are not."
+                             " PPO / G1_29dof / isaacsim only.")
     parser.add_argument("--algo", default="ppo", choices=["ppo", "fast_sac"],
                         help="RL algorithm (default: ppo)")
     parser.add_argument("--logger-type", default="wandb",
@@ -315,7 +365,8 @@ def main():
                                         retarget_task_type=args.retarget_task_type)
     print(f"Retarget run: {retarget_run}")
 
-    with_object_actor = args.with_object_actor
+    dynamics = args.dynamics
+    with_object_actor = args.with_object_actor or dynamics
     with_object = args.with_object or with_object_actor
 
     # Prepare trainer inputs
@@ -344,7 +395,9 @@ def main():
     print(f"Policy run: {policy_run_dir}")
 
     # Launch training
-    if with_object_actor:
+    if dynamics:
+        task_label = "with_object_actor_grip_force_dyn"
+    elif with_object_actor:
         task_label = "with_object_actor"
     elif with_object:
         task_label = "with_object"
@@ -355,7 +408,7 @@ def main():
     run_training(cfg, args.simulator, trainer_inputs, policy_run_dir, robot,
                  args.algo, with_object, logger_type, args.num_envs, args.checkpoint,
                  object_urdf=object_urdf, with_object_actor=with_object_actor,
-                 no_video=args.no_video)
+                 dynamics=dynamics, no_video=args.no_video)
 
     # Write config snapshot
     with open(policy_run_dir / "config.yaml", "w") as f:
@@ -370,6 +423,7 @@ def main():
             "retarget_task_type": args.retarget_task_type,
             "with_object": with_object,
             "with_object_actor": with_object_actor,
+            "dynamics": dynamics,
             "retarget_run": str(retarget_run),
             "num_envs": args.num_envs,
             "object_urdf": object_urdf,

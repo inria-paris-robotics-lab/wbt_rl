@@ -90,6 +90,16 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 |--------|--------|-------|
 | **unitree_ros2** | [unitreerobotics/unitree_ros2](https://github.com/unitreerobotics/unitree_ros2) | PyBullet sim-to-sim, sim-to-real via ROS2 |
 
+### Dynamics enrichment (optional, off the main path)
+
+| Module | Source | Produces |
+|--------|--------|----------|
+| **SPIDER** ⚠️ 🔒 | [facebookresearch/spider](https://github.com/facebookresearch/spider) | joint torques + per-contact forces for a retargeted clip |
+
+🔒 **CC BY-NC 4.0 — non-commercial only.** The one module here with a restrictive
+licence, so it is excluded from `./install.sh all`; install it explicitly with
+`./install.sh spider`. See [scripts/README.md](scripts/README.md#enrich_dynamicspy).
+
 ---
 
 ## Repository Structure
@@ -107,6 +117,7 @@ wbt_rl/
 │   ├── 02_training/           # one yaml per trainer (holosoma, holosoma_custom, test_pipe)
 │   ├── 03_inference/          # one yaml per inference engine
 │   ├── 04_deployment/         # one yaml per deployer (unitree)
+│   ├── 05_dynamics/           # spider.yaml + scenes/ (per-clip object manifests)
 │   └── motion_convertor/      # internal preprocessing helpers (not pipeline stages)
 │
 ├── scripts/                   → see scripts/README.md
@@ -114,6 +125,7 @@ wbt_rl/
 │   ├── train.py
 │   ├── infer.py
 │   ├── deploy.py
+│   ├── enrich_dynamics.py     # optional: torques + contact forces for a clip
 │   └── activate_wbt.sh        # source this to activate the ecosystem
 │
 ├── src/

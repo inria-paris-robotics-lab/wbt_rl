@@ -87,6 +87,39 @@ def conda_run(
     )
 
 
+def venv_run(
+    venv: str,
+    cmd: str,
+    cwd: Path | None = None,
+    check: bool = True,
+    env_vars: dict | None = None,
+) -> subprocess.CompletedProcess:
+    """
+    Run a shell command against a venv-managed module environment.
+
+    `conda_run`'s sibling for modules that ship a `.venv` (uv/pip) instead of a
+    conda env — SPIDER installs with `uv sync`, so there is no conda env to
+    select. `venv` is the venv root; its `bin/` is prepended to PATH so plain
+    `python ...` in `cmd` resolves to the module's interpreter.
+    """
+    if cwd is None:
+        cwd = repo_root()
+
+    venv_bin = Path(os.path.expandvars(venv)).expanduser() / "bin"
+    if not (venv_bin / "python").exists():
+        raise FileNotFoundError(
+            f"No interpreter at {venv_bin / 'python'} — is the module installed? "
+            f"(see installers/)"
+        )
+
+    env_prefix = ""
+    if env_vars:
+        env_prefix = " ".join(f"{k}={v}" for k, v in env_vars.items()) + " "
+
+    full_cmd = f"bash -c 'export PATH={venv_bin}:$PATH && cd {cwd} && {env_prefix}{cmd}'"
+    return subprocess.run(full_cmd, shell=True, check=check, stdin=subprocess.DEVNULL)
+
+
 def run_entry_point(stage: str, module: str, entry: str, args: dict, cwd: Path | None = None) -> subprocess.CompletedProcess:
     """
     Run a named entry point from cfg/<stage>/<module>.yaml.

@@ -1,0 +1,232 @@
+diff --git a/examples/run_mjwp.py b/examples/run_mjwp.py
+index ce6a506..3ebb507 100644
+--- a/examples/run_mjwp.py
++++ b/examples/run_mjwp.py
+@@ -584,7 +584,11 @@ def main(config: Config):
+         qpos_ref_np = qpos_ref[: qpos_traj.shape[0]].detach().cpu().numpy()
+         data_type = "mjwp_act" if config.contact_guidance else "mjwp"
+         errors = compute_object_tracking_error(
+-            qpos_traj, qpos_ref_np, config.embodiment_type, data_type
++            qpos_traj,
++            qpos_ref_np,
++            config.embodiment_type,
++            data_type,
++            num_objects=int(getattr(config, "num_objects", 1)),
+         )
+         loguru.logger.info(
+             "Final object tracking error: pos={:.4f}, quat={:.4f}",
+diff --git a/spider/config.py b/spider/config.py
+index 5354fb3..2aab82a 100644
+--- a/spider/config.py
++++ b/spider/config.py
+@@ -102,6 +102,10 @@ class Config:
+     object_action_dims: int = 0
+     object_actuator_ids: list[int] = field(default_factory=list)
+     object_actuator_names: list[str] = field(default_factory=list)
++    # WBT-RL: number of DYNAMIC objects for the "humanoid_nobj" embodiment.
++    # Each contributes 6 DOF (3 slide + 3 hinge, intrinsic XYZ Euler) at the tail
++    # of qpos, plus 6 position actuators named obj{i}_{pos,rot}_{x,y,z}.
++    num_objects: int = 1
+     init_pos_actuator_gain: float = 10.0
+     init_pos_actuator_bias: float = 10.0
+     init_rot_actuator_gain: float = 0.1
+@@ -256,6 +260,10 @@ def build_hand_contact_site_ids(
+     mj_model: mujoco.MjModel, embodiment_type: str
+ ) -> tuple[list[tuple[str, str]], list[int | None]]:
+     contact_order = []
++    # WBT-RL: humanoid_nobj tracks no fingertip sites (the G1 has no articulated
++    # fingers in this scene), so there is no per-finger contact table to build.
++    if embodiment_type == "humanoid_nobj":
++        return contact_order, []
+     if embodiment_type in ["bimanual", "right"]:
+         contact_order.extend(
+             [
+@@ -304,6 +312,12 @@ def build_hand_contact_site_ids(
+ def get_object_pos_ctrl_indices(config: Config) -> tuple[list[int], list[int]]:
+     right_ids: list[int] = []
+     left_ids: list[int] = []
++    # WBT-RL: humanoid_nobj has no per-hand object split (objects are shared by the
++    # whole body, not assigned to a left/right dexterous hand). Returning empty
++    # lists disables the fingertip-delta nudge in run_mjwp.py, which is what we
++    # want -- guidance for this embodiment comes purely from the kp/kd anneal.
++    if config.embodiment_type == "humanoid_nobj":
++        return right_ids, left_ids
+     if config.object_actuator_ids and config.object_actuator_names:
+         for aid, name in zip(
+             config.object_actuator_ids, config.object_actuator_names, strict=False
+@@ -431,6 +445,11 @@ def process_config(config: Config):
+             "right": 7,
+             "left": 7,
+         }.get(config.embodiment_type, 0)
++    # WBT-RL: N-object humanoid. Every dynamic object is an explicit 6-DOF
++    # slide+hinge chain (never a freejoint), so the DOF count is 6*N whether or
++    # not contact guidance is on -- there is no quaternion tail to account for.
++    if config.embodiment_type == "humanoid_nobj":
++        config.nq_obj = 6 * max(int(config.num_objects), 0)
+ 
+     # resolve processed directories for this trial
+     dataset_dir_abs = os.path.abspath(config.dataset_dir)
+@@ -469,6 +488,18 @@ def process_config(config: Config):
+             desired_names = (
+                 config.object_pos_actuator_names + config.object_rot_actuator_names
+             )
++            # WBT-RL: for humanoid_nobj the actuator set is generated per object,
++            # so derive both the dim and the names from num_objects instead of the
++            # hand-centric right_/left_ defaults.
++            if config.embodiment_type == "humanoid_nobj":
++                n_obj = max(int(config.num_objects), 0)
++                config.object_action_dims = 6 * n_obj
++                desired_names = [
++                    f"obj{i}_{group}_{axis}"
++                    for i in range(n_obj)
++                    for group in ("pos", "rot")
++                    for axis in ("x", "y", "z")
++                ]
+             object_ids, object_names = resolve_object_actuator_ids(
+                 model,
+                 desired_names,
+diff --git a/spider/postprocess/get_success_rate.py b/spider/postprocess/get_success_rate.py
+index 770b150..eeaf0cc 100644
+--- a/spider/postprocess/get_success_rate.py
++++ b/spider/postprocess/get_success_rate.py
+@@ -121,9 +121,39 @@ def compute_object_tracking_error(
+     qpos_ref: np.ndarray,
+     embodiment_type: str,
+     data_type: str,
++    num_objects: int = 1,
+ ) -> dict:
+     """Compute object position/quaternion tracking error for a trajectory."""
+     use_act = data_type.endswith("_act")
++    if embodiment_type == "humanoid_nobj":
++        # WBT-RL: N dynamic objects, each a 6-DOF [pos(3), euler(3)] block in the
++        # qpos tail. Report the mean error across objects (the single-object
++        # branch below would silently score only the LAST object).
++        n_obj = max(int(num_objects), 1)
++        n_obj_dof = 6 * n_obj
++        pos_errs, quat_errs, aucs = [], [], []
++        for i in range(n_obj):
++            s = qpos_traj.shape[1] - n_obj_dof + 6 * i
++            pos_t = qpos_traj[:, s : s + 3]
++            pos_r = qpos_ref[:, s : s + 3]
++            quat_t = _euler_to_quat_wxyz(qpos_traj[:, s + 3 : s + 6])
++            quat_r = _euler_to_quat_wxyz(qpos_ref[:, s + 3 : s + 6])
++            pos_errs.append(np.linalg.norm(pos_t - pos_r, axis=1).mean())
++            quat_errs.append(np.linalg.norm(quat_sub(quat_t, quat_r), axis=1).mean())
++            aucs.append(compute_add_auc10(pos_t, pos_r))
++        return {
++            "obj_pos_err": float(np.mean(pos_errs)),
++            "obj_quat_err": float(np.mean(quat_errs)),
++            "pos_err_right": float("nan"),
++            "pos_err_left": float("nan"),
++            "quat_err_right": float("nan"),
++            "quat_err_left": float("nan"),
++            "add_auc10_right": float("nan"),
++            "add_auc10_left": float("nan"),
++            "add_auc10_mean": float(np.mean(aucs)),
++            "per_object_pos_err": [float(e) for e in pos_errs],
++            "per_object_quat_err": [float(e) for e in quat_errs],
++        }
+     if embodiment_type == "bimanual":
+         if use_act:
+             qpos_object_right_traj = qpos_traj[:, -12:-6]
+diff --git a/spider/simulators/mjwp.py b/spider/simulators/mjwp.py
+index de31668..ea10b7f 100644
+--- a/spider/simulators/mjwp.py
++++ b/spider/simulators/mjwp.py
+@@ -91,7 +91,7 @@ def setup_mj_model(config: Config) -> mujoco.MjModel:
+             2,
+         ]  # softer contact for sim2real
+         model_cpu.opt.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
+-    elif config.embodiment_type in ["humanoid", "humanoid_object"]:
++    elif config.embodiment_type in ["humanoid", "humanoid_object", "humanoid_nobj"]:
+         # setup for humanoid
+         model_cpu.opt.iterations = 5
+         model_cpu.opt.ls_iterations = 10
+@@ -205,6 +205,21 @@ def _weight_diff_qpos(config: Config) -> torch.Tensor:
+         # object pos and rot
+         w[-6:-3] = config.pos_rew_scale
+         w[-3:] = config.rot_rew_scale
++    elif config.embodiment_type in ["humanoid_nobj"]:
++        # WBT-RL: floating-base humanoid + N dynamic objects, each 6 DOF
++        # (3 slide + 3 hinge). nv layout: [base_pos(3), base_rot(3), joints(nj),
++        # obj_0(6), ..., obj_{N-1}(6)].
++        n_obj_dof = int(config.nq_obj)
++        w[:3] = config.base_pos_rew_scale
++        w[3:6] = config.base_rot_rew_scale
++        if n_obj_dof > 0:
++            w[6:-n_obj_dof] = config.joint_rew_scale
++            for i in range(n_obj_dof // 6):
++                s = config.nv - n_obj_dof + 6 * i
++                w[s : s + 3] = config.pos_rew_scale
++                w[s + 3 : s + 6] = config.rot_rew_scale
++        else:
++            w[6:] = config.joint_rew_scale
+     else:
+         raise ValueError(f"Invalid embodiment_type: {config.embodiment_type}")
+     return w
+@@ -267,6 +282,24 @@ def _diff_qpos(
+         # object
+         qpos_diff[:, -6:-3] = qpos_object[:, :3] - qpos_ref_object[:, :3]
+         qpos_diff[:, -3:] = quat_sub(qpos_object[:, 3:7], qpos_ref_object[:, 3:7])
++    elif config.embodiment_type in ["humanoid_nobj"]:
++        # WBT-RL: floating-base humanoid + N dynamic objects.
++        #   qpos: [base_pos(3), base_quat(4), joints(nj), obj_0(6) ... obj_{N-1}(6)]
++        #   nv:   [base_pos(3), base_rot(3),  joints(nj), obj_0(6) ... obj_{N-1}(6)]
++        # Objects are slide+hinge chains (Euler angles, not quaternions), so the
++        # object tail differences plainly in both spaces -- no quat_sub needed.
++        n_obj_dof = int(config.nq_obj)
++        qpos_diff[:, :3] = qpos_sim[:, :3] - qpos_ref[:, :3]
++        qpos_diff[:, 3:6] = quat_sub(qpos_sim[:, 3:7], qpos_ref[:, 3:7])
++        if n_obj_dof > 0:
++            qpos_diff[:, 6:-n_obj_dof] = (
++                qpos_sim[:, 7:-n_obj_dof] - qpos_ref[:, 7:-n_obj_dof]
++            )
++            qpos_diff[:, -n_obj_dof:] = (
++                qpos_sim[:, -n_obj_dof:] - qpos_ref[:, -n_obj_dof:]
++            )
++        else:
++            qpos_diff[:, 6:] = qpos_sim[:, 7:] - qpos_ref[:, 7:]
+     else:
+         raise ValueError(f"Invalid embodiment_type: {config.embodiment_type}")
+     return qpos_diff
+@@ -325,6 +358,14 @@ def _object_pose_slice(
+         pos = qpos[-7:-4].copy()
+         quat = qpos[-4:].copy()
+         return pos, quat, None, None
++    if embodiment_type == "humanoid_nobj":
++        # WBT-RL: only used by the initial-state sanity check, which reports a
++        # single object's drift. Report object 0; its rotation is an Euler
++        # triple, not a quaternion, so no quat is returned.
++        if nq_obj >= 6:
++            start = qpos.shape[0] - nq_obj  # object 0 sits first in the tail
++            return qpos[start : start + 3].copy(), None, None, None
++        return None, None, None, None
+     # No object on this embodiment (humanoid only)
+     return None, None, None, None
+ 
+@@ -788,7 +829,7 @@ def get_terminate(
+         terminate = (obj_pos_error > config.object_pos_threshold) | (
+             obj_quat_error > config.object_rot_threshold
+         )
+-    elif config.embodiment_type in ["humanoid", "humanoid_object"]:
++    elif config.embodiment_type in ["humanoid", "humanoid_object", "humanoid_nobj"]:
+         base_pos = qpos_sim[:, :3]
+         base_pos_ref = qpos_ref[:3].unsqueeze(0)
+         base_pos_error = torch.norm(base_pos - base_pos_ref, p=2, dim=1)
+@@ -1036,6 +1077,16 @@ def load_env_params(config: Config, env: MJWPEnv, env_param: dict):
+             qpos_override_th[:, -7:-5] = (
+                 qpos_override_th[:, -7:-5] + env_param["xy_offset"]
+             )
++        elif config.embodiment_type == "humanoid_nobj":
++            # WBT-RL: shift every dynamic object's xy, each object being a 6-DOF
++            # block [pos(3), rot(3)] in the qpos tail.
++            n_obj_dof = int(config.nq_obj)
++            nq_total = qpos_override_th.shape[1]
++            for i in range(n_obj_dof // 6):
++                s = nq_total - n_obj_dof + 6 * i
++                qpos_override_th[:, s : s + 2] = (
++                    qpos_override_th[:, s : s + 2] + env_param["xy_offset"]
++                )
+ 
+         wp.copy(env.data_wp.qpos, wp.from_torch(qpos_override_th))
+ 

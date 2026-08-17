@@ -1,0 +1,57 @@
+# Scene manifest for femto14_box36, hand-geometry variant.
+#
+# Identical to femto14_box36.yaml (same clip, same box/table objects) except
+# for robot_geoms: this points at a SINGLE convex-hull mesh per hand built
+# from the exact vertex cloud of holosoma_custom's training half-sphere hand
+# mesh (data/robots/g1/meshes/half_sphere.obj), instead of SPIDER's own
+# 109-piece convex-hull decomposition of the RUBBER hand.
+#
+# The hull is scipy/trimesh's plain ConvexHull of the mesh's true (deduplicated)
+# vertex cloud -- 7705 vertices, 0 source vertices left outside (mathematically
+# guaranteed containment), mean/max inflation 6.4/15.9 mm. SPIDER's own CoACD
+# decomposition tool (spider/preprocess/decompose.py) was tried first and
+# REJECTED: both its default 3-piece output and a forced single-piece output
+# left 45-46% of the true mesh's vertices outside the approximation (up to
+# 13 mm gaps) -- CoACD minimizes a volume/surface deviation cost, not
+# containment, which is the wrong guarantee for a contact proxy (a gap there
+# is a patch of the real hand that can never register contact).
+#
+# Pairs with cfg/05_dynamics/robot_assets/g1_29dof_halfsphere_hand/scene.xml
+# (--robot-assets), which grafts this one mesh geom per wrist onto SPIDER's
+# stock (kp=500) scene.
+#
+# Why this matters: SPIDER's rubber-hand hull has a ~0.165 m median lever arm
+# from the wrist_yaw axis to a hand<->box contact; the half-sphere training
+# geometry measures ~0.052 m (3.2x smaller) -- training grips with
+# fingertips, SPIDER's stock hand was gripping with the whole palm. That
+# inflated every wrist-torque reading extracted from the dynamics sidecar.
+# This manifest fixes the MISMATCH (measure contact on the geometry training
+# actually simulates); it does not touch the kp=500 actuator gains, which are
+# a separate, already-closed experiment (cfg/05_dynamics/spider_realgains.yaml).
+#
+# See ../README.md for the field reference.
+
+objects:
+  - name: box36
+    kind: dynamic
+    urdf: modules/third_party/holosoma_custom/src/holosoma/holosoma/data/motions/g1_29dof/whole_body_tracking/objects_box36.urdf
+    pos_key: object_pos_w
+    quat_key: object_quat_w
+
+  - name: support
+    kind: static
+    mesh: modules/third_party/holosoma_custom/src/holosoma/holosoma/data/motions/g1_29dof/whole_body_tracking/femto14_support_box36.obj
+    pos_key: support_pos_w
+    quat_key: support_quat_w
+    rgba: "0.6 0.4 0.2 1"
+
+contact:
+  # One convex-hull mesh geom per hand -- see the file header for how it was
+  # built and why (CoACD rejected, plain convex hull kept). NOT SPIDER's own
+  # left/right_wrist_yaw_link_cvx_* rubber-hand hull, which remains in the
+  # patched scene but unreferenced (harmless: contype=0 by default, and
+  # MuJoCo pairs are explicit).
+  robot_geoms: [left_wrist_yaw_link_halfsphere, right_wrist_yaw_link_halfsphere]
+  object_object: true   # box <-> table
+  object_floor: true    # box <-> ground once released
+  condim: 4

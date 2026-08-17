@@ -1,0 +1,110 @@
+diff --git a/spider/config.py b/spider/config.py
+index 5354fb3..bfb86a4 100644
+--- a/spider/config.py
++++ b/spider/config.py
+@@ -102,6 +102,10 @@ class Config:
+     object_action_dims: int = 0
+     object_actuator_ids: list[int] = field(default_factory=list)
+     object_actuator_names: list[str] = field(default_factory=list)
++    # WBT-RL: number of DYNAMIC objects for the "humanoid_nobj" embodiment.
++    # Each contributes 6 DOF (3 slide + 3 hinge, intrinsic XYZ Euler) at the tail
++    # of qpos, plus 6 position actuators named obj{i}_{pos,rot}_{x,y,z}.
++    num_objects: int = 1
+     init_pos_actuator_gain: float = 10.0
+     init_pos_actuator_bias: float = 10.0
+     init_rot_actuator_gain: float = 0.1
+@@ -134,6 +138,22 @@ class Config:
+     exploit_noise_scale: float = 0.01
+     # Noise scaling by component
+     joint_noise_scale: float = 0.15
++    # WBT-RL: per-ROBOT-actuator override, applied to the leading `len(vec)`
++    # columns of nu instead of the flat `joint_noise_scale` scalar (object DOF
++    # columns, if any, still get the scalar). Exists because CEM exploration
++    # noise is defined in ctrl (position-target) space, uniformly across
++    # joints regardless of their actuator gain -- at stock kp=500 that always
++    # converts to a large exploratory TORQUE, but at a real robot's much
++    # softer per-joint kp (e.g. G1 wrist ~17 vs hip ~40-99) the SAME ctrl
++    # perturbation induces 5-35x less exploratory torque, and the CEM loses
++    # the ability to discover a gravity-compensating / gripping trajectory
++    # within its sample budget -- confirmed empirically (wbt_rl SPIDER_TORQUE
++    # session): lowering kp+kv to real gains alone made a standing rollout
++    # collapse it hadn't before. Set element i to
++    # `joint_noise_scale * kp_stock[i] / kp_real[i]` to keep the SAME
++    # exploratory-torque budget when kp is lowered to real gains. Empty
++    # (default) = old uniform-scalar behaviour, unchanged.
++    joint_noise_scale_vec: list[float] = field(default_factory=list)
+     pos_noise_scale: float = 0.03
+     rot_noise_scale: float = 0.03
+     # Reward mode
+@@ -256,6 +276,10 @@ def build_hand_contact_site_ids(
+     mj_model: mujoco.MjModel, embodiment_type: str
+ ) -> tuple[list[tuple[str, str]], list[int | None]]:
+     contact_order = []
++    # WBT-RL: humanoid_nobj tracks no fingertip sites (the G1 has no articulated
++    # fingers in this scene), so there is no per-finger contact table to build.
++    if embodiment_type == "humanoid_nobj":
++        return contact_order, []
+     if embodiment_type in ["bimanual", "right"]:
+         contact_order.extend(
+             [
+@@ -304,6 +328,12 @@ def build_hand_contact_site_ids(
+ def get_object_pos_ctrl_indices(config: Config) -> tuple[list[int], list[int]]:
+     right_ids: list[int] = []
+     left_ids: list[int] = []
++    # WBT-RL: humanoid_nobj has no per-hand object split (objects are shared by the
++    # whole body, not assigned to a left/right dexterous hand). Returning empty
++    # lists disables the fingertip-delta nudge in run_mjwp.py, which is what we
++    # want -- guidance for this embodiment comes purely from the kp/kd anneal.
++    if config.embodiment_type == "humanoid_nobj":
++        return right_ids, left_ids
+     if config.object_actuator_ids and config.object_actuator_names:
+         for aid, name in zip(
+             config.object_actuator_ids, config.object_actuator_names, strict=False
+@@ -366,6 +396,16 @@ def get_noise_scale(config: Config) -> torch.Tensor:
+             noise_scale[:, :, half_dof + 6 : robot_nu] *= config.joint_noise_scale
+         elif config.embodiment_type in ["right", "left"]:
+             noise_scale[:, :, 6:robot_nu] *= config.joint_noise_scale
++    elif config.joint_noise_scale_vec:
++        # humanoid_nobj (and any other non-hand embodiment): robot actuators
++        # come first in nu (see spider_extract_dynamics.py's robot_act_dofadr
++        # -- same convention relied on there), object DOFs (if any) after.
++        vec = torch.as_tensor(
++            config.joint_noise_scale_vec, device=config.device, dtype=noise_scale.dtype
++        )
++        n = vec.shape[0]
++        noise_scale[:, :, :n] *= vec
++        noise_scale[:, :, n:] *= config.joint_noise_scale
+     else:
+         noise_scale *= config.joint_noise_scale
+     if config.contact_guidance and config.object_actuator_ids:
+@@ -431,6 +471,11 @@ def process_config(config: Config):
+             "right": 7,
+             "left": 7,
+         }.get(config.embodiment_type, 0)
++    # WBT-RL: N-object humanoid. Every dynamic object is an explicit 6-DOF
++    # slide+hinge chain (never a freejoint), so the DOF count is 6*N whether or
++    # not contact guidance is on -- there is no quaternion tail to account for.
++    if config.embodiment_type == "humanoid_nobj":
++        config.nq_obj = 6 * max(int(config.num_objects), 0)
+ 
+     # resolve processed directories for this trial
+     dataset_dir_abs = os.path.abspath(config.dataset_dir)
+@@ -469,6 +514,18 @@ def process_config(config: Config):
+             desired_names = (
+                 config.object_pos_actuator_names + config.object_rot_actuator_names
+             )
++            # WBT-RL: for humanoid_nobj the actuator set is generated per object,
++            # so derive both the dim and the names from num_objects instead of the
++            # hand-centric right_/left_ defaults.
++            if config.embodiment_type == "humanoid_nobj":
++                n_obj = max(int(config.num_objects), 0)
++                config.object_action_dims = 6 * n_obj
++                desired_names = [
++                    f"obj{i}_{group}_{axis}"
++                    for i in range(n_obj)
++                    for group in ("pos", "rot")
++                    for axis in ("x", "y", "z")
++                ]
+             object_ids, object_names = resolve_object_actuator_ids(
+                 model,
+                 desired_names,

@@ -356,3 +356,71 @@ python scripts/deploy.py --mode SIM --robot g1_29dof --g1-dof 29
 │  bridge                   │
 └───────────────────────────┘
 ```
+
+---
+
+## enrich_dynamics.py
+
+Optional stage **05_dynamics**, off the main retarget → train → infer path.
+
+Retargeting answers *where the robot should be*; it never answers *what it would
+take to get there*. This replays a retargeted clip through SPIDER's sampling-MPC
+in MuJoCo Warp — real gravity, real object mass, real friction, real contacts —
+and records what the motion actually costs.
+
+> ⚠️ SPIDER is **CC BY-NC 4.0 (non-commercial)** and is therefore excluded from
+> `./install.sh all`. Install it explicitly: `./install.sh spider`.
+
+**CLI:**
+```bash
+python scripts/enrich_dynamics.py \
+    --scene cfg/05_dynamics/scenes/femto14_box36.yaml \
+    --dataset OMOMO --robot G1_29dof --retargeter holosoma_custom \
+    [--sequences femto14 ...] [--retarget-run latest] \
+    [--num-samples 1024] [--max-iterations 8]
+
+# or point straight at one motion file, skipping the run lookup:
+python scripts/enrich_dynamics.py --scene <manifest>.yaml --motion <clip>.npz --out-dir <dir>
+```
+
+**Input** is the **trainer-input** form (`*_trainer_input.npz`), not the unified
+output — only that form carries object poses. Run `scripts/train.py` first, or
+pass `--motion` directly.
+
+**What it does:**
+1. Reads the scene manifest → builds a MuJoCo scene with the robot plus every
+   object (geometry, mass and friction taken from each object's URDF), and the
+   explicit contact pairs between them.
+2. Runs SPIDER's MPC: it samples candidate torque sequences, rolls them forward
+   in real physics on GPU, and executes the best — replanning on a receding
+   horizon. Virtual "guidance" forces hold objects on their reference path early
+   on, then anneal to zero, so the accepted trajectory is physically self-supporting.
+3. Re-solves each frame's contacts to recover per-pair forces.
+
+**Output** — a sidecar next to the retargeting run, leaving every existing file
+and the unified format untouched:
+```
+{seq}_output_dynamics.npz     qpos, qvel, tau, object_poses,
+                              contact_force / contact_torque / contact_mask
+dynamics/                     SPIDER scene + raw rollout (kept, for replay)
+```
+
+| Key | Shape | Meaning |
+|-----|-------|---------|
+| `qpos` / `qvel` | `(T, nq)` / `(T, nv)` | generalised position / velocity |
+| `tau` | `(T, 29)` | joint torques, N·m (robot actuators are direct-drive `<motor>`) |
+| `object_poses` | `(T, N, 7)` | per dynamic object, `[qw,qx,qy,qz,x,y,z]` |
+| `contact_force` | `(T, K, 3)` | per pair, in the **contact frame**: `[normal, tangent1, tangent2]` |
+| `contact_mask` | `(T, K)` | whether the pair was touching that frame |
+
+**Multiple objects:** add entries to the manifest's `objects` list — see
+[cfg/05_dynamics/scenes/README.md](../cfg/05_dynamics/scenes/README.md). Each
+dynamic object adds 6 DOF; static ones (tables, walls) are free.
+
+**Sanity-checking the numbers:** summed foot-floor normal forces should come out
+near the robot's weight (~343 N for a 35 kg G1), and a resting object's
+floor force near its own. If they don't, suspect the scene before the physics.
+
+**GPU:** `--num-samples 1024` needs roughly 4 GB on top of the model. Sharing the
+card with a training job, drop to 512 or 256 — an overflow shows up as
+`Warp CUDA error 2: out of memory` during `put_data`.

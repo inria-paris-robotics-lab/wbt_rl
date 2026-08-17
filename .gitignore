@@ -22,11 +22,20 @@ data/00_raw_datasets/HOI-M3/*
 data/00_raw_datasets/PA-HOI_Dataset/*
 !data/00_raw_datasets/PA-HOI_Dataset/.gitkeep
 
+data/00_raw_datasets/MotionX/*
+!data/00_raw_datasets/MotionX/.gitkeep
+
 data/01_retargeted_motions/*
 !data/01_retargeted_motions/README.md
 
 data/02_policies/*
 !data/02_policies/.gitkeep
+
+# Sorties de l'etage 05 (sidecars SPIDER et clips enrichis) : regenerables
+# par scripts/enrich_dynamics.py + merge_dynamics.py, lourdes, locales.
+data/dynamics/*
+!data/dynamics/.gitkeep
+data/*.npz
 
 # Python
 __pycache__/

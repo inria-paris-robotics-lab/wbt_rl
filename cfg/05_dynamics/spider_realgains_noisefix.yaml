@@ -1,0 +1,64 @@
+# SPIDER — real-G1-actuator-gains experiment, take 2: per-actuator CEM
+# exploration noise instead of a single global multiplier.
+#
+# spider_realgains.yaml's flat joint_noise_scale=2.0 (x20 the stock 0.1) was
+# an average across a 5-35x range of kp drop (hip/knee ~5x, wrist/shoulder
+# ~30-35x) -- it OVER-shot the stiff joints and UNDER-shot the soft ones
+# simultaneously, and the resulting run still failed to lift the box (see
+# installers/patches/... / the SPIDER_TORQUE session notes: contact force
+# went erratic, box never left the floor).
+#
+# Root fix instead: installers/patches/spider-per-joint-noise-scale.patch
+# adds Config.joint_noise_scale_vec (list[float], one entry per ROBOT
+# actuator, in scene actuator-declaration order -- same order
+# spider_extract_dynamics.py's robot_act_dofadr relies on). Each entry is
+# joint_noise_scale_base (0.1) * kp_stock (500) / kp_real[joint], restoring
+# the SAME exploratory-TORQUE budget per joint that the stock kp=500 rig had,
+# instead of the same exploratory-ANGLE budget (which is what a flat scalar
+# in ctrl/radian space gives you, regardless of what torque that implies).
+#
+# Requires the patch applied to the spider submodule's working tree (see
+# installers/modules/spider.sh's apply step; this file assumes it already is).
+
+venv: modules/third_party/spider/.venv
+module_root: modules/05_dynamics/spider
+robot_assets: modules/third_party/spider/spider/assets/robots/unitree_g1
+
+native_input_format: spider_scene_npz
+native_output_format: spider_dynamics_npz
+
+cmd: python examples/run_mjwp.py
+
+base_overrides:
+  - +override=humanoid_object
+  - embodiment_type=humanoid_nobj
+  - contact_guidance=true
+  - +use_torch_compile=false
+  - viewer=""
+  - show_viewer=false
+  - save_video=false
+  - nconmax_per_env=300
+  - njmax_per_env=1400
+  - +sanity_check_seconds=0.0
+  - +joint_noise_scale_vec=[1.2444,0.5045,1.2444,0.5045,1.7543,1.7543,1.2444,0.5045,1.2444,0.5045,1.7543,1.7543,1.2444,1.7543,1.7543,3.5086,3.5086,3.5086,3.5086,3.5086,2.9800,2.9800,3.5086,3.5086,3.5086,3.5086,3.5086,2.9800,2.9800]
+
+args:
+  task:               task
+  data_id:            data_id
+  robot_type:         robot_type
+  dataset_name:       dataset_name
+  dataset_dir:        dataset_dir
+  num_objects:        +num_objects
+  num_samples:        num_samples
+  max_num_iterations: max_num_iterations
+  sim_dt:             sim_dt
+  ref_dt:             ref_dt
+  trace_dt:           trace_dt
+
+defaults:
+  robot_type: unitree_g1
+  num_samples: 1024
+  max_num_iterations: 8
+  sim_dt: 0.01
+  ref_dt: 0.02
+  trace_dt: 0.02
