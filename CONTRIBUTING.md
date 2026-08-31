@@ -86,7 +86,7 @@ modules/<module>
 ```
 
 Leaving the module **out** of `MODULES` keeps it installable on demand (`./install.sh <module>`) but excluded
-from a full install — this is exactly how the experimental `holonew_retargeting` module is wired.
+from a full install — this is exactly how the licence-restricted `spider` module is wired.
 
 ## 5 — Document it
 

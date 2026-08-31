@@ -63,7 +63,6 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | **PHC** | [ZhengyiLuo/PHC](https://github.com/ZhengyiLuo/PHC) | SFU |
 | **holosoma_retargeting** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | LAFAN1, SFU, OMOMO_NEW |
 | **holosoma_retargeting_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | LAFAN1, SFU, OMOMO_NEW |
-| **HoloNew** ⚠️ | [Guillaume-Bsst/HoloNew](https://github.com/Guillaume-Bsst/HoloNew) | experimental |
 
 > **OMOMO (original):** pipeline not yet working end-to-end — 🚧 in progress.
 
@@ -136,7 +135,6 @@ wbt_rl/
 └── modules/
     ├── 01_retargeting/
     │   ├── GMR/                            # submodule — YanjieZe/GMR
-    │   ├── HoloNew/                        # submodule — Guillaume-Bsst/HoloNew  (experimental, not yet in cfg/)
     │   ├── holosoma_retargeting            # symlink → third_party/holosoma
     │   └── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
     ├── 02_training/
@@ -168,13 +166,12 @@ git submodule update --init --recursive
 ./install.sh
 ```
 
-Four isolated ecosystems, nothing touches your system conda:
+Three isolated ecosystems, nothing touches your system conda:
 
 | Ecosystem | Location | Envs |
 |-----------|----------|------|
 | wbt + GMR | `~/.wbt_deps/` | `wbt_rl`, `gmr` |
 | holosoma (upstream + custom) | `~/.holosoma_deps/` | `hsretargeting`, `hsmujoco`, `hsgym`, `hssim`, `hsinference` |
-| HoloNew ⚠️ | `~/.holonew_deps/` | `holonew` |
 | deployment | your system conda | `unitree_control_interface` |
 
 Re-running is safe — already-installed envs are skipped via sentinel files.
@@ -194,7 +191,7 @@ Re-running is safe — already-installed envs are skipped via sentinel files.
 ./install.sh holosoma_inference                 # hsinference env
 ./install.sh unitree_control_interface          # deployment env (system conda)
 # On-demand only (excluded from full install):
-./install.sh holonew_retargeting                # HoloNew isolated env
+./install.sh spider                             # SPIDER isolated env (non-commercial licence)
 ```
 
 ### 3 — Install the datasets you want to use

@@ -66,3 +66,6 @@ modules/Log/
 
 # Local logs / run outputs (heavy, local-only)
 /logs/
+
+# HoloNew: local-only working repo (its own git), no longer a wbt_rl submodule
+modules/01_retargeting/HoloNew/
