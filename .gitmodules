@@ -22,9 +22,6 @@
 [submodule "src/motion_convertor/third_party/smplx"]
 	path = src/motion_convertor/third_party/smplx
 	url = https://github.com/vchoutas/smplx.git
-[submodule "modules/third_party/test_pipe"]
-	path = modules/third_party/test_pipe
-	url = https://github.com/Guillaume-Bsst/test_pipe.git
 [submodule "modules/01_retargeting/HoloNew"]
 	path = modules/01_retargeting/HoloNew
 	url = https://github.com/Guillaume-Bsst/HoloNew.git

@@ -146,8 +146,7 @@ Input is always the **raw retargeter output**, not the unified.
 > For holosoma→holosoma: the raw retargeter output **is** already the trainer input (form B). No conversion needed.
 
 > **holosoma_custom** mirrors holosoma's data formats, so it reuses holosoma's unified-output converter and
-> has its own trainer-input converter. **test_pipe** is an experimental sandbox that reuses the holosoma
-> formats as well — it has no dedicated converter and is not part of the benchmarking baseline.
+> has its own trainer-input converter.
 
 ### Two connector philosophies (by design)
 

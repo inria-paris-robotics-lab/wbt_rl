@@ -64,7 +64,6 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 | **holosoma_retargeting** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | LAFAN1, SFU, OMOMO_NEW |
 | **holosoma_retargeting_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | LAFAN1, SFU, OMOMO_NEW |
 | **HoloNew** ⚠️ | [Guillaume-Bsst/HoloNew](https://github.com/Guillaume-Bsst/HoloNew) | experimental |
-| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
 > **OMOMO (original):** pipeline not yet working end-to-end — 🚧 in progress.
 
@@ -74,7 +73,6 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 |---------|--------|-----------|-----------|
 | **holosoma** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | PPO, FastSAC | IsaacGym, IsaacSim |
 | **holosoma_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | PPO, FastSAC | IsaacSim |
-| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental | experimental |
 
 ### Inference
 
@@ -82,7 +80,6 @@ Raw MoCap datasets (LAFAN1, OMOMO, SFU, ...)
 |--------|--------|-------|
 | **holosoma_inference** | [amazon-far/holosoma](https://github.com/amazon-far/holosoma) | MuJoCo sim-to-sim, Unitree API |
 | **holosoma_inference_custom** | [Guillaume-Bsst/holosoma_custom](https://github.com/Guillaume-Bsst/holosoma_custom) | MuJoCo sim-to-sim, Unitree API, **ROS2** |
-| **test_pipe** ⚠️ | [Guillaume-Bsst/test_pipe](https://github.com/Guillaume-Bsst/test_pipe) | experimental |
 
 ### Deployment
 
@@ -113,8 +110,8 @@ wbt_rl/
 │
 ├── cfg/                       # module configs — see cfg/README.md
 │   ├── 00_datasets/           # data.yaml (paths) + per-dataset raw-format metadata
-│   ├── 01_retargeting/        # one yaml per retargeter (gmr, holosoma, holosoma_custom, test_pipe)
-│   ├── 02_training/           # one yaml per trainer (holosoma, holosoma_custom, test_pipe)
+│   ├── 01_retargeting/        # one yaml per retargeter (gmr, holosoma, holosoma_custom)
+│   ├── 02_training/           # one yaml per trainer (holosoma, holosoma_custom)
 │   ├── 03_inference/          # one yaml per inference engine
 │   ├── 04_deployment/         # one yaml per deployer (unitree)
 │   ├── 05_dynamics/           # spider.yaml + scenes/ (per-clip object manifests)
@@ -141,22 +138,18 @@ wbt_rl/
     │   ├── GMR/                            # submodule — YanjieZe/GMR
     │   ├── HoloNew/                        # submodule — Guillaume-Bsst/HoloNew  (experimental, not yet in cfg/)
     │   ├── holosoma_retargeting            # symlink → third_party/holosoma
-    │   ├── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
-    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
+    │   └── holosoma_retargeting_custom     # symlink → third_party/holosoma_custom
     ├── 02_training/
     │   ├── holosoma                        # symlink → third_party/holosoma
-    │   ├── holosoma_custom                 # symlink → third_party/holosoma_custom
-    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
+    │   └── holosoma_custom                 # symlink → third_party/holosoma_custom
     ├── 03_inference/
     │   ├── holosoma_inference              # symlink → third_party/holosoma
-    │   ├── holosoma_inference_custom       # symlink → third_party/holosoma_custom
-    │   └── test_pipe                       # symlink → third_party/test_pipe  (experimental)
+    │   └── holosoma_inference_custom       # symlink → third_party/holosoma_custom
     ├── 04_deployment/
     │   └── unitree_ros2/                   # submodule — unitreerobotics/unitree_ros2
     └── third_party/
         ├── holosoma/                       # submodule — amazon-far/holosoma
-        ├── holosoma_custom/                # submodule — Guillaume-Bsst/holosoma_custom
-        └── test_pipe/                      # submodule — Guillaume-Bsst/test_pipe  (experimental)
+        └── holosoma_custom/                # submodule — Guillaume-Bsst/holosoma_custom
 ```
 
 ---
@@ -202,7 +195,6 @@ Re-running is safe — already-installed envs are skipped via sentinel files.
 ./install.sh unitree_control_interface          # deployment env (system conda)
 # On-demand only (excluded from full install):
 ./install.sh holonew_retargeting                # HoloNew isolated env
-./install.sh test_pipe_retargeting              # test_pipe isolated env
 ```
 
 ### 3 — Install the datasets you want to use
